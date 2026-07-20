@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#f2efe7"/>
+  <path d="M0 70h1200M0 560h1200M70 0v630M1130 0v630" stroke="#161711" stroke-opacity=".22"/>
+  <rect x="70" y="70" width="76" height="76" fill="#161711"/>
+  <text x="108" y="119" fill="#fffef8" font-family="monospace" font-size="24" text-anchor="middle">JC</text>
+  <text x="70" y="260" fill="#161711" font-family="Georgia,serif" font-size="78">Research beyond</text>
+  <text x="70" y="346" fill="#1746d1" font-family="Georgia,serif" font-size="78" font-style="italic">the training distribution.</text>
+  <text x="70" y="510" fill="#161711" font-family="monospace" font-size="22">JACK CAI · PRINCETON COMPUTER SCIENCE</text>
+</svg>

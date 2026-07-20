@@ -1,0 +1,29 @@
+---
+interface Props {
+  title: string;
+  description: string;
+  topic: string;
+  date?: Date;
+  href: string;
+  external?: boolean;
+}
+
+const { title, description, topic, date, href, external = false } = Astro.props;
+const formattedDate = date
+  ? new Intl.DateTimeFormat("en", { month: "short", year: "numeric", timeZone: "UTC" }).format(date)
+  : "In progress";
+---
+
+<article class="writing-row">
+  <div class="writing-meta">
+    <span>{topic}</span>
+    <time datetime={date?.toISOString()}>{formattedDate}</time>
+  </div>
+  <a href={href} target={external ? "_blank" : undefined} rel={external ? "noopener noreferrer" : undefined}>
+    <div>
+      <h3>{title}</h3>
+      <p>{description}</p>
+    </div>
+    <span class="row-arrow" aria-hidden="true">{external ? "↗" : "→"}</span>
+  </a>
+</article>

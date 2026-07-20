@@ -1,0 +1,141 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import WritingRow from "../components/WritingRow.astro";
+import { writing } from "../data/writing";
+
+const latestWriting = writing.slice(0, 3);
+
+const research = [
+  {
+    title: "Generalization beyond the training distribution",
+    text: "Understanding how learning systems extrapolate across length, hardness, and composition—and what their successes reveal about learned algorithms.",
+  },
+  {
+    title: "Self-improving learning systems",
+    text: "Studying synthetic data, weak-to-strong scaling, and feedback loops that let models create increasingly useful supervision.",
+  },
+  {
+    title: "Automating the research loop",
+    text: "Finding research problems where hypothesis generation becomes structured search, then designing agents that can explore that space in parallel.",
+  },
+];
+
+const publications = [
+  {
+    year: "2025",
+    venue: "NeurIPS · Spotlight",
+    title: "Extrapolation by Association: Length Generalization Transfer in Transformers",
+    authors: "Ziyang Cai, Nayoung Lee, Avi Schwarzschild, Samet Oymak, Dimitris Papailiopoulos",
+  },
+  {
+    year: "2025",
+    venue: "ICML",
+    title: "Self-Improving Models Overcome Length and Hardness Generalization via Weak-to-Strong Scaling",
+    authors: "Ziyang Cai*, Nayoung Lee*, Avi Schwarzschild, Kangwook Lee, Dimitris Papailiopoulos",
+  },
+  {
+    year: "2025",
+    venue: "ICML · Spotlight",
+    title: "Everything Everywhere All at Once: LLMs Can In-Context Learn Multiple Tasks in Superposition",
+    authors: "Zheyang Xiong, Ziyang Cai, John Cooper, et al.",
+  },
+  {
+    year: "2022",
+    venue: "NeurIPS",
+    title: "Delving into Out-of-Distribution Detection with Vision-Language Representations",
+    authors: "Yifei Ming, Ziyang Cai, Jiuxiang Gu, Yiyou Sun, Wei Li, Yixuan Li",
+  },
+];
+---
+
+<BaseLayout>
+  <section class="intro">
+    <h1>
+      I’m a PhD student in computer science at Princeton, advised by Sanjeev Arora.
+    </h1>
+    <p>
+      My research focuses on how machine learning systems generalize beyond their training
+      data. I’m particularly interested in self-improving models, synthetic data, and
+      automated research.
+    </p>
+    <div class="intro-links">
+      <a href="mailto:zc5794@princeton.edu">Email</a>
+      <a href="https://github.com/JackCai1206">GitHub</a>
+      <a href="/Jack_CV-16.pdf">Curriculum vitae</a>
+    </div>
+  </section>
+
+  <section class="writing-preview">
+    <div class="section-title-row">
+      <div>
+        <p class="eyebrow">Latest</p>
+        <h2>Writing</h2>
+      </div>
+      <a class="text-link" href="/writing/">All writing →</a>
+    </div>
+    <div class="writing-list">
+      {
+        latestWriting.map((post) => (
+          <WritingRow
+            title={post.title}
+            description={post.description}
+            topic={post.topic}
+            date={post.publishedAt}
+            href={post.href}
+            external={post.external}
+          />
+        ))
+      }
+    </div>
+  </section>
+
+  <section class="secondary-grid">
+    <div class="research-summary" id="research">
+      <h2>Research</h2>
+      <p class="summary-intro">
+        I combine controlled synthetic problems, empirical scaling, and theory to study what
+        models learn and what they can discover next.
+      </p>
+      <div class="research-list">
+        {
+          research.map((item) => (
+            <article class="research-item">
+              <h3>{item.title}</h3>
+              <p>{item.text}</p>
+            </article>
+          ))
+        }
+      </div>
+    </div>
+
+    <div class="publications-summary" id="publications">
+      <div class="summary-title-row">
+        <h2>Selected papers</h2>
+        <a class="text-link" href="/Jack_CV-16.pdf">Full CV →</a>
+      </div>
+      <div class="publication-list">
+        {
+          publications.map((publication) => (
+            <article class="publication-row">
+              <div class="publication-meta">
+                <span>{publication.year}</span>
+                <span>{publication.venue}</span>
+              </div>
+              <h3>{publication.title}</h3>
+              <p>{publication.authors}</p>
+            </article>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="background-note">
+    <h2>Background</h2>
+    <p>
+      Before Princeton, I studied at UW–Madison and built automated synthetic-data pipelines
+      for coding agents at Microsoft Research. I was previously advised by Dimitris
+      Papailiopoulos, Junjie Hu, and Sharon Li.
+    </p>
+  </section>
+</BaseLayout>
