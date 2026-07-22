@@ -275,6 +275,30 @@
   <code>cp3late</code>, &minus;29 cycles and a record), and goes to null exactly where it should: the near-ceiling control seed and
   the truly near-ceiling kernel branches. That dose-response-plus-null is what a causal headroom-recovery
   story requires.</div>
+
+  <h3>3.3 Coordination at scale: communication and repeated branch selection</h3>
+  <figure>
+    <div class="imgbox"><img src="cifar-communication-iso-cost.png"
+      alt="tinyCIFAR communication at eight agents versus independent baselines, with an iso-cost panel"></div>
+    <figcaption><b>Communication @8, first 40-hour leg.</b> The left panel shows all eight
+    checkpoint trajectories on a mean-per-agent credit clock. The iso-cost panel charges
+    expected independent performance at single-run cost and both best-of-eight outcomes at
+    aggregate fleet cost. At 157,405 checkpointed communication credits, best-of-comm reaches
+    0.5176 merit versus 0.3998 for the independent average and 0.6116 for independent best-of-eight.
+    The hard Harbor timeout interrupted each final episode; those unpriced tails are excluded from
+    this snapshot, and the fleet was subsequently resumed toward its 400K aggregate cap.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="imgbox"><img src="kernel-branch-selection-trajectories.png"
+      alt="kernel reset and continuation branch-selection trajectories through two fork rounds"></div>
+    <figcaption><b>Powered branch selection through round two.</b> Reset round 1 selected
+    <code>r1b5</code> at 1,235 cycles and the resumed lineage reached 1,228 before entering an
+    active second reset fork. Continue round 1 selected <code>r1b3</code> at 1,224; round 2
+    selected <code>r2b2</code> at 1,213, which remains the selected-lineage record. The x-axis
+    follows selected-lineage credits plus each branch&rsquo;s local credits; it is intentionally
+    not the aggregate protocol-spend axis.</figcaption>
+  </figure>
 </section>
 
 <section id="s4">
