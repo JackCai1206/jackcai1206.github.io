@@ -1,0 +1,1694 @@
+---
+const title = "Research Agents Need to Clear Their Head: Context Reset for Exploration — Jack Cai";
+const description =
+  "A five-minute presentation on using context resets to restore exploration in long-running research agents.";
+const canonicalURL = new URL(Astro.url.pathname, Astro.site);
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonicalURL} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title}</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#slide-0">Skip to slides</a>
+
+    <header class="deck-header">
+      <a href="/" class="wordmark">Jack Cai</a>
+      <div class="deck-links">
+        <a href="/writing/stuck-agents-report/">Full report</a>
+        <span aria-hidden="true">/</span>
+        <span>5 minute talk</span>
+      </div>
+    </header>
+
+    <main class="deck" aria-label="Research agent resets presentation">
+      <section class="slide title-slide" id="slide-0" data-title="Title" tabindex="-1">
+        <div class="slide-inner">
+          <p class="kicker">Jack Cai</p>
+          <h1>Research agents need to clear their head: context reset for exploration</h1>
+          <p class="mentor-credit">
+            Mentors: Shivam Garg &middot; Vasilis Kontonis &middot; Dimitris Papailiopoulos
+          </p>
+        </div>
+      </section>
+
+      <section class="slide setup-slide" id="slide-1" data-title="Setup" tabindex="-1">
+        <div class="slide-inner">
+          <div class="slide-heading">
+            <div>
+              <p class="kicker">01 / Experimental setup</p>
+              <h2 class="setup-title">Auto-research agents</h2>
+            </div>
+            <p class="timing">0:00&ndash;1:10</p>
+          </div>
+
+          <p class="setup-intro">
+            Each seed is one persistent Copilot conversation. Within every bounded episode, the
+            agent cycles through many coding and grading rounds; a continuation prompt starts the
+            next episode.
+          </p>
+
+          <div class="episode-loop" aria-label="Research agent episode lifecycle">
+            <div class="episode-cycle">
+              <p class="episode-cycle-label">Within each episode &middot; repeat many times</p>
+              <div class="episode-cycle-steps">
+                <div class="episode-step">
+                  <span>1</span>
+                  <strong>Code &amp; experiment</strong>
+                  <p>Inspect, edit, and run local tests</p>
+                </div>
+                <div class="episode-step">
+                  <span>2</span>
+                  <strong>Submit</strong>
+                  <p>Send the current artifact</p>
+                </div>
+                <div class="episode-step">
+                  <span>3</span>
+                  <strong>Grade</strong>
+                  <p>Receive score and feedback, then code again</p>
+                </div>
+              </div>
+            </div>
+            <div class="episode-step episode-boundary">
+              <span>Episode boundary</span>
+              <strong>Episode ends</strong>
+              <p>Snapshot files, session, and credits</p>
+            </div>
+            <div class="episode-step episode-continuation">
+              <span>Between episodes</span>
+              <strong>Continuation prompt</strong>
+              <p>Resume the conversation and begin the next episode</p>
+            </div>
+          </div>
+
+          <div class="task-grid">
+            <article class="task-card kernel">
+              <p class="task-number">Task A</p>
+              <h3>Kernel optimization</h3>
+              <p>
+                Write and schedule instructions for a simulated processor. A hardened grader
+                returns execution cycles.
+              </p>
+              <dl>
+                <div><dt>Score</dt><dd>cycles &darr;</dd></div>
+                <div><dt>Campaign</dt><dd>8 seeds &times; ~105K credits</dd></div>
+              </dl>
+            </article>
+            <article class="task-card cifar">
+              <p class="task-number">Task B</p>
+              <h3>tinyCIFAR gz-golf</h3>
+              <p>
+                Ship a self-contained CIFAR-10 classifier. The score trades sealed-test accuracy
+                against compressed artifact size.
+              </p>
+              <dl>
+                <div><dt>Score</dt><dd>accuracy &times; size</dd></div>
+                <div><dt>Campaign</dt><dd>8 independent &times; 31&ndash;68K</dd></div>
+              </dl>
+            </article>
+          </div>
+
+        </div>
+        <aside class="speaker-notes" aria-label="Speaker notes">
+          <strong>0:00&ndash;1:10</strong>
+          A research agent is a persistent Copilot session wrapped in an experiment loop. Within
+          each episode it repeatedly edits and tests code, submits an artifact, receives a scalar
+          score, and uses that feedback for another coding round. At episode completion the harness
+          checkpoints the workspace and Copilot session and records billed credits. A continuation
+          prompt then resumes the same conversation for the next episode. We repeat this on two
+          broad optimization tasks where the agent must choose among strategy families.
+        </aside>
+      </section>
+
+      <section class="slide trajectory-slide" id="slide-2" data-title="Fleet curves" tabindex="-1">
+        <div class="slide-inner">
+          <div class="slide-heading">
+            <div>
+              <p class="kicker">02 / Performance curves</p>
+              <h2>The average is predictable. Individual outcomes are not.</h2>
+            </div>
+            <p class="timing">1:10&ndash;1:35</p>
+          </div>
+
+          <ul class="curve-insight">
+            <li><strong>Noise cancels out:</strong> the fleet average follows a smooth log-sigmoid fit.</li>
+            <li><strong>Variance persists:</strong> individual runs remain widely dispersed.</li>
+          </ul>
+
+          <div class="figure-grid figure-grid-single">
+            <figure class="figure-card">
+              <img
+                src="/writing/fig2_trajectories_mean.png"
+                alt="Rainbow-colored kernel and tinyCIFAR seed trajectories with every graded submission and the fleet mean overlaid"
+              />
+            </figure>
+          </div>
+        </div>
+        <aside class="speaker-notes" aria-label="Speaker notes">
+          <strong>1:10&ndash;1:35</strong>
+          Every run improves quickly, then grinds through long plateaus. The waiting time to the
+          next gain is highly uneven and long-tailed. Aggregation is deceptively smooth, but the
+          cross-seed band never closes and early leaders often lose. That looks less like one noisy
+          learning curve and more like a mixture of basins with different floors.
+        </aside>
+      </section>
+
+      <section class="slide trajectory-slide" id="slide-2-linear" data-title="Fleet curves · linear" tabindex="-1">
+        <div class="slide-inner">
+          <div class="slide-heading">
+            <div>
+              <p class="kicker">02B / Linear credit axis</p>
+              <h2>Most of the budget is spent waiting.</h2>
+            </div>
+            <p class="timing">1:35&ndash;2:00</p>
+          </div>
+
+          <ul class="curve-summary">
+            <li>
+              <strong>Long plateaus:</strong> individual runs spend extended periods without
+              improving, even as the fleet average looks smooth.
+            </li>
+            <li>
+              <strong>Long-tailed waits:</strong> the next gain can arrive quickly or only after a
+              very long search.
+            </li>
+          </ul>
+
+          <div class="figure-grid figure-grid-single">
+            <figure class="figure-card">
+              <img
+                src="/writing/fig2_trajectories_mean_linear.png"
+                alt="The same kernel and tinyCIFAR seed trajectories plotted against a linear credit axis"
+              />
+            </figure>
+          </div>
+        </div>
+        <aside class="speaker-notes" aria-label="Speaker notes">
+          <strong>1:35&ndash;2:00</strong>
+          This is exactly the same data on a linear credit axis. The long horizontal stretches now
+          dominate the picture: most of the budget is spent waiting, and meaningful gains arrive as
+          sparse jumps. This motivates treating a plateau as a search-state problem rather than
+          assuming steady incremental progress.
+        </aside>
+      </section>
+
+      <section class="slide" id="slide-3" data-title="Reset evidence" tabindex="-1">
+        <div class="slide-inner">
+          <div class="slide-heading">
+            <div>
+              <p class="kicker">03 / Causal intervention</p>
+              <h2>Context reset as intervention for plateaus</h2>
+            </div>
+            <p class="timing">2:00&ndash;3:10</p>
+          </div>
+
+          <div class="reset-layout">
+            <div class="reset-story">
+              <p class="reset-definition">
+                <strong>Context reset</strong> keeps the current workspace and best artifact, but
+                starts a fresh conversation with no prior chat history.
+              </p>
+
+              <div class="fork-design">
+                <p class="incumbent">Same plateaued workspace</p>
+                <div class="fork-line"></div>
+                <div class="fork-arms">
+                  <div class="arm continue">
+                    <span>Continue</span>
+                    <small>same conversation</small>
+                  </div>
+                  <div class="arm reset">
+                    <span>Reset</span>
+                    <small>blank conversation</small>
+                  </div>
+                </div>
+                <p class="equal-budget">Equal compute &middot; same incumbent at &Delta; score = 0</p>
+              </div>
+
+              <div class="result-grid">
+                <div><strong>5/9</strong><span>branch means favor reset</span></div>
+                <div><strong>4/9</strong><span>branch means tie</span></div>
+                <div><strong>+0.03</strong><span>mean reset advantage</span></div>
+                <div><strong>2 vs 0</strong><span>brief reaches: reset vs continue</span></div>
+              </div>
+            </div>
+
+            <figure class="reset-figure">
+              <img
+                src="/writing/fig4_cifar_forks.png"
+                alt="Budget-matched continue and reset forks across tinyCIFAR plateau branch points"
+              />
+              <figcaption>
+                Reset exceeds continuation at five branch points and ties at four. The continuous
+                effect varies substantially across starting points.
+              </figcaption>
+            </figure>
+          </div>
+        </div>
+        <aside class="speaker-notes" aria-label="Speaker notes">
+          <strong>2:00&ndash;3:10</strong>
+          A context reset preserves the workspace and incumbent artifact but removes the prior
+          conversation. Fork each cold run from the same files: one arm retains the conversation;
+          the other starts blank. Re-center each branch at its own incumbent and compare the
+          continuous score gain. Reset beats continuation at five of nine branch points and ties at
+          four, with a mean advantage of about 0.03 points. From below-brief starts, two reset forks
+          reach the fixed brief versus zero continuation forks. The kernel study repeats the effect
+          and produces the campaign record.
+        </aside>
+      </section>
+
+      <section class="slide" id="slide-4" data-title="Theory" tabindex="-1">
+        <div class="slide-inner">
+          <div class="slide-heading">
+            <div>
+              <p class="kicker">04 / A minimal model</p>
+              <h2>Reset breaks a correlated search trajectory</h2>
+            </div>
+            <p class="timing">3:10&ndash;4:20</p>
+          </div>
+
+          <div class="model-layout">
+            <div class="model-figure-column">
+              <div class="model-notes">
+                <p class="wip-copy">Work in progress</p>
+                <p>Illustration only</p>
+              </div>
+              <div class="performance-model">
+              <svg
+                class="performance-curves"
+                viewBox="0 30 620 300"
+                role="img"
+                aria-labelledby="performance-curves-title performance-curves-desc"
+              >
+                <title id="performance-curves-title">Continue and reset branches from one search history</title>
+                <desc id="performance-curves-desc">
+                  A sequence of proposal dots forms a shared best-so-far curve. At the reset
+                  boundary, continuation remains on a correlated plateau while a reset retains the
+                  current best result and begins an independent branch that reaches the target.
+                </desc>
+                <line class="axis" x1="45" y1="270" x2="575" y2="270"></line>
+                <line class="axis" x1="45" y1="270" x2="45" y2="45"></line>
+                <line class="target-line" x1="45" y1="95" x2="575" y2="95"></line>
+                <text class="target-label" x="567" y="86" text-anchor="end">target q</text>
+
+                <g class="proposal-points continue-points">
+                  <circle cx="62" cy="240" r="4"></circle>
+                  <circle cx="87" cy="220" r="4"></circle>
+                  <circle cx="112" cy="233" r="4"></circle>
+                  <circle cx="137" cy="195" r="4"></circle>
+                  <circle cx="162" cy="211" r="4"></circle>
+                  <circle cx="187" cy="204" r="4"></circle>
+                  <circle cx="212" cy="198" r="4"></circle>
+                  <circle cx="237" cy="208" r="4"></circle>
+                  <circle cx="262" cy="196" r="4"></circle>
+                  <circle cx="287" cy="202" r="4"></circle>
+                </g>
+                <path class="record-curve continue-record" d="M62 240 H87 V220 H137 V195 H310"></path>
+
+                <line class="reset-boundary" x1="310" y1="45" x2="310" y2="270"></line>
+                <text class="reset-label" x="310" y="289" text-anchor="middle">reset boundary r</text>
+                <text class="retained-label" x="318" y="188">retain Q<tspan baseline-shift="sub">r</tspan></text>
+
+                <g class="proposal-points continue-points">
+                  <circle cx="335" cy="201" r="4"></circle>
+                  <circle cx="360" cy="191" r="4"></circle>
+                  <circle cx="385" cy="205" r="4"></circle>
+                  <circle cx="410" cy="194" r="4"></circle>
+                  <circle cx="435" cy="187" r="4"></circle>
+                  <circle cx="460" cy="193" r="4"></circle>
+                  <circle cx="485" cy="183" r="4"></circle>
+                  <circle cx="510" cy="190" r="4"></circle>
+                  <circle cx="535" cy="180" r="4"></circle>
+                  <circle cx="560" cy="186" r="4"></circle>
+                </g>
+                <path
+                  class="record-curve continue-record"
+                  d="M310 195 H360 V191 H435 V187 H485 V183 H535 V180 H575"
+                ></path>
+                <text class="branch-label continue-label" x="568" y="169" text-anchor="end">CONTINUE</text>
+
+                <g class="proposal-points reset-points">
+                  <circle cx="335" cy="216" r="4"></circle>
+                  <circle cx="360" cy="168" r="4"></circle>
+                  <circle cx="385" cy="155" r="4"></circle>
+                  <circle cx="410" cy="122" r="4"></circle>
+                  <circle cx="435" cy="142" r="4"></circle>
+                  <circle cx="460" cy="88" r="4"></circle>
+                  <circle cx="485" cy="112" r="4"></circle>
+                  <circle cx="510" cy="75" r="4"></circle>
+                  <circle cx="535" cy="92" r="4"></circle>
+                  <circle cx="560" cy="68" r="4"></circle>
+                </g>
+                <path
+                  class="record-curve reset-record"
+                  d="M310 195 H360 V168 H385 V155 H410 V122 H460 V88 H510 V75 H560 V68 H575"
+                ></path>
+                <text class="branch-label reset-branch-label" x="568" y="57" text-anchor="end">RESET</text>
+
+                <text class="axis-label" x="310" y="316" text-anchor="middle">proposal number n</text>
+              </svg>
+              <div class="curve-legend" aria-hidden="true">
+                <span><i class="proposal-key"></i>proposal Y<sub>n</sub></span>
+                <span><i class="record-key"></i>running maximum Q<sub>n</sub></span>
+                <span><i class="reset-key"></i>decorrelation boundary</span>
+              </div>
+              </div>
+            </div>
+
+            <div class="model-cards">
+              <article>
+                <p class="model-label">Simple model of performance curve</p>
+                <div class="equation equation-stack">
+                  <span>Q<sub>n</sub> = max<sub>k &le; n</sub> Y<sub>k</sub></span>
+                  <span>Corr(Y<sub>n</sub>, Y<sub>n+&ell;</sub>) = &rho;<sup>&ell;</sup></span>
+                </div>
+                <p>Persistence clusters similar proposals, creating long plateaus and broad finite-budget outcomes.</p>
+              </article>
+              <article class="decision-card">
+                <p class="model-label">Reset is a boundary cut</p>
+                <div class="equation">
+                  (Q<sub>r</sub>, Z<sub>r</sub>) &rarr; (Q<sub>r</sub>, Z&prime;<sub>0</sub>),
+                  &nbsp;Z&prime;<sub>0</sub> &#8869; Z<sub>r</sub>
+                </div>
+                <p>Keep the best result; redraw the latent search state. Normal within-segment correlation then resumes.</p>
+              </article>
+              <article class="prediction-card">
+                <p class="model-label">Finite-budget prediction</p>
+                <ul>
+                  <li>
+                    Resetting decorrelates the run, producing more independent search&mdash;and
+                    more variance&mdash;locally. (Eventually, a common reachable ceiling implies
+                    that variance vanishes.)
+                  </li>
+                  <li>
+                    When persistence traps continuation, reset raises the chance of reaching high
+                    quality within a fixed budget.
+                  </li>
+                </ul>
+              </article>
+            </div>
+          </div>
+
+        </div>
+        <aside class="speaker-notes" aria-label="Speaker notes">
+          <strong>3:10&ndash;4:20</strong>
+          Model the agent's candidate solutions as a correlated proposal sequence Y. Observed
+          performance is its running maximum Q, because successful artifacts survive. Strong
+          persistence means nearby proposals are similar, so a run can spend a long time on one
+          plateau. Reset does not erase Q or permanently lower correlation. It cuts dependence at
+          one boundary by drawing a new latent search state independent of the old one; that new
+          segment develops its own correlated trajectory. The finite-budget prediction is a higher
+          chance of reaching target quality when persistence was trapping continuation. This is not
+          a universal variance theorem: spread may rise before runs eventually concentrate near a
+          common reachable ceiling.
+        </aside>
+      </section>
+
+      <section class="slide" id="slide-5" data-title="Policies" tabindex="-1">
+        <div class="slide-inner">
+          <div class="slide-heading">
+            <div>
+              <p class="kicker">05 / Ongoing ideas</p>
+              <h2>From a point intervention to a reset policy</h2>
+            </div>
+            <p class="timing">4:20&ndash;5:00</p>
+          </div>
+
+          <div class="policy-grid">
+            <article>
+              <p class="policy-number">01</p>
+              <h3>Branch-select</h3>
+              <p>At a stall, launch K reset branches in parallel, race them, and continue from the strongest branch.</p>
+              <div class="policy-flow">detect &rarr; fork &rarr; race &rarr; select</div>
+            </article>
+            <article>
+              <p class="policy-number">02</p>
+              <h3>Communicate</h3>
+              <p>Let parallel branches exchange scores and concise discoveries without collapsing into one shared context.</p>
+              <div class="policy-flow">search &harr; signal &harr; redirect</div>
+            </article>
+            <article>
+              <p class="policy-number">03</p>
+              <h3>Reset on interval</h3>
+              <p>Reset context on a fixed cadence while retaining the workspace and best artifact; sweep cadence against overhead.</p>
+              <div class="policy-flow">continue &rarr; reset &rarr; continue &rarr; reset</div>
+            </article>
+          </div>
+
+        </div>
+        <aside class="speaker-notes" aria-label="Speaker notes">
+          <strong>4:20&ndash;5:00</strong>
+          The fork study is a point intervention at a hand-picked plateau. The next step is to define
+          policies over a whole run. Branch-select spends temporary width and keeps the winner.
+          Communication lets branches redirect one another without restoring a single shared
+          trajectory. Interval reset is the simplest longitudinal baseline: preserve the workspace
+          but refresh context on a fixed cadence, then measure the tradeoff against reset overhead.
+        </aside>
+      </section>
+    </main>
+
+    <div class="progress" aria-hidden="true"><span id="progress-bar"></span></div>
+
+    <nav class="deck-controls" aria-label="Presentation controls">
+      <button type="button" id="previous-slide" aria-label="Previous slide">&larr;</button>
+      <span id="slide-status" aria-live="polite">1 / 7</span>
+      <button type="button" id="next-slide" aria-label="Next slide">&rarr;</button>
+      <button type="button" id="toggle-notes" aria-pressed="false">Notes</button>
+      <button type="button" id="toggle-fullscreen">Full</button>
+    </nav>
+
+    <p class="keyboard-help">
+      <span>&larr; &rarr; navigate</span>
+      <span>N notes</span>
+      <span>F fullscreen</span>
+    </p>
+
+    <script>
+      const slides = Array.from(document.querySelectorAll<HTMLElement>(".slide"));
+      const status = document.querySelector<HTMLElement>("#slide-status");
+      const progress = document.querySelector<HTMLElement>("#progress-bar");
+      const previous = document.querySelector<HTMLButtonElement>("#previous-slide");
+      const next = document.querySelector<HTMLButtonElement>("#next-slide");
+      const notes = document.querySelector<HTMLButtonElement>("#toggle-notes");
+      const fullscreen = document.querySelector<HTMLButtonElement>("#toggle-fullscreen");
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      let current = Math.max(
+        0,
+        slides.findIndex((slide) => `#${slide.id}` === window.location.hash),
+      );
+
+      const updateChrome = (index: number) => {
+        current = Math.max(0, Math.min(index, slides.length - 1));
+        if (status) status.textContent = `${current + 1} / ${slides.length}`;
+        if (progress) progress.style.width = `${((current + 1) / slides.length) * 100}%`;
+        if (previous) previous.disabled = current === 0;
+        if (next) next.disabled = current === slides.length - 1;
+      };
+
+      const showSlide = (index: number) => {
+        const target = Math.max(0, Math.min(index, slides.length - 1));
+        slides[target]?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" });
+        history.replaceState(null, "", `#${slides[target]?.id}`);
+        updateChrome(target);
+      };
+
+      previous?.addEventListener("click", () => showSlide(current - 1));
+      next?.addEventListener("click", () => showSlide(current + 1));
+      notes?.addEventListener("click", () => {
+        const visible = document.body.dataset.notes !== "true";
+        document.body.dataset.notes = String(visible);
+        notes.setAttribute("aria-pressed", String(visible));
+      });
+      fullscreen?.addEventListener("click", () => {
+        if (document.fullscreenElement) void document.exitFullscreen();
+        else void document.documentElement.requestFullscreen();
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.metaKey || event.ctrlKey || event.altKey) return;
+        if (["ArrowRight", "PageDown", " "].includes(event.key)) {
+          event.preventDefault();
+          showSlide(current + 1);
+        } else if (["ArrowLeft", "PageUp"].includes(event.key)) {
+          event.preventDefault();
+          showSlide(current - 1);
+        } else if (event.key === "Home") {
+          showSlide(0);
+        } else if (event.key === "End") {
+          showSlide(slides.length - 1);
+        } else if (event.key.toLowerCase() === "n") {
+          notes?.click();
+        } else if (event.key.toLowerCase() === "f") {
+          fullscreen?.click();
+        }
+      });
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          const visible = entries
+            .filter((entry) => entry.isIntersecting)
+            .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+          if (!visible) return;
+          const index = slides.indexOf(visible.target as HTMLElement);
+          if (index >= 0) {
+            history.replaceState(null, "", `#${slides[index].id}`);
+            updateChrome(index);
+          }
+        },
+        { threshold: [0.55, 0.8] },
+      );
+
+      slides.forEach((slide) => observer.observe(slide));
+      updateChrome(current);
+      if (window.location.hash) slides[current]?.scrollIntoView();
+    </script>
+  </body>
+</html>
+
+<style is:global>
+  :root {
+    --paper: #f5f4ef;
+    --card: #fffefa;
+    --ink: #182028;
+    --muted: #66707a;
+    --line: #d9dcd7;
+    --blue: #2c57d6;
+    --blue-soft: #e8edff;
+    --red: #c85036;
+    --red-soft: #f8e9e4;
+    --green: #20755b;
+    --gold: #a06b0f;
+    --serif: Charter, "Bitstream Charter", "Iowan Old Style", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --text-label: clamp(14px, 1vw, 16px);
+    --text-small: clamp(15px, 1.1vw, 17px);
+    --text-body: clamp(17px, 1.25vw, 19px);
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    background: var(--paper);
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    overflow: hidden;
+    color: var(--ink);
+    background: var(--paper);
+    font-family: var(--sans);
+    text-rendering: optimizeLegibility;
+  }
+
+  a {
+    color: inherit;
+  }
+
+  button {
+    color: inherit;
+    font: inherit;
+  }
+
+  .skip-link {
+    position: fixed;
+    z-index: 20;
+    top: 8px;
+    left: 8px;
+    padding: 8px 12px;
+    color: white;
+    background: var(--blue);
+    transform: translateY(-150%);
+  }
+
+  .skip-link:focus {
+    transform: translateY(0);
+  }
+
+  .deck-header {
+    position: fixed;
+    z-index: 10;
+    top: 0;
+    left: 0;
+    width: 100%;
+    min-height: 48px;
+    padding: 0 3vw;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    border-bottom: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+    background: color-mix(in srgb, var(--paper) 92%, transparent);
+    backdrop-filter: blur(10px);
+  }
+
+  .wordmark {
+    font: 700 17px/1 var(--serif);
+    text-decoration: none;
+  }
+
+  .deck-links {
+    display: flex;
+    gap: 10px;
+    color: var(--muted);
+    font: 14px/1 var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .deck-links a {
+    color: var(--blue);
+    text-underline-offset: 3px;
+  }
+
+  .deck {
+    height: 100svh;
+    overflow-y: auto;
+    scroll-snap-type: y mandatory;
+  }
+
+  .slide {
+    position: relative;
+    min-height: 100svh;
+    padding: 7.5vh 4vw 7vh;
+    display: grid;
+    place-items: center;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    outline: none;
+  }
+
+  .slide-inner {
+    width: min(1180px, 92vw);
+    height: min(780px, 85vh);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .kicker,
+  .timing,
+  .task-number,
+  .policy-number,
+  .model-label {
+    margin: 0;
+    color: var(--blue);
+    font: 600 var(--text-label)/1.3 var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.11em;
+  }
+
+  h1,
+  h2,
+  h3,
+  p {
+    text-wrap: pretty;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--serif);
+  }
+
+  h1 {
+    max-width: 15ch;
+    margin: 3vh 0 2.2vh;
+    font-size: clamp(42px, 6vw, 82px);
+    font-weight: 700;
+    line-height: 0.98;
+    letter-spacing: -0.035em;
+  }
+
+  h2 {
+    margin: 0.5vh 0 0;
+    font-size: clamp(28px, 3.5vw, 48px);
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+  }
+
+  h3 {
+    margin: 0;
+    font-size: clamp(19px, 1.8vw, 27px);
+    line-height: 1.1;
+  }
+
+  .setup-title {
+    max-width: 24ch;
+    margin: 0.4vh 0 0;
+    font-size: clamp(30px, 3.6vw, 50px);
+    line-height: 1.04;
+    letter-spacing: -0.025em;
+  }
+
+  .title-slide .slide-inner {
+    align-items: flex-start;
+  }
+
+  .title-slide h1 {
+    max-width: 17ch;
+  }
+
+  .mentor-credit {
+    margin: 20px 0 0;
+    color: var(--muted);
+    font-size: clamp(21px, 1.8vw, 27px);
+    line-height: 1.35;
+  }
+
+  .slide-heading {
+    margin-bottom: clamp(14px, 2.4vh, 26px);
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 32px;
+  }
+
+  .timing {
+    flex: 0 0 auto;
+    color: var(--muted);
+  }
+
+  .setup-intro {
+    max-width: 88ch;
+    margin: 0 0 clamp(11px, 1.7vh, 17px);
+    color: var(--muted);
+    font-size: var(--text-body);
+    line-height: 1.4;
+  }
+
+  .episode-loop {
+    margin-bottom: clamp(12px, 1.8vh, 18px);
+    display: grid;
+    grid-template-columns: 3.2fr 1fr 1.25fr;
+    gap: clamp(14px, 1.7vw, 22px);
+  }
+
+  .episode-cycle {
+    position: relative;
+    padding: 9px;
+    border: 1px solid color-mix(in srgb, var(--blue) 38%, var(--line));
+    border-radius: 10px;
+    background: var(--blue-soft);
+  }
+
+  .episode-cycle::after {
+    content: "\2192";
+    position: absolute;
+    top: 51%;
+    right: clamp(-18px, -1.35vw, -13px);
+    color: var(--blue);
+    font: 700 15px/1 var(--mono);
+  }
+
+  .episode-cycle-label {
+    margin: 0 0 7px;
+    color: var(--blue);
+    font: 600 var(--text-label)/1 var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .episode-cycle-steps {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: clamp(12px, 1.4vw, 19px);
+  }
+
+  .episode-step {
+    position: relative;
+    min-width: 0;
+    min-height: 98px;
+    padding: clamp(11px, 1.2vw, 15px);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card);
+  }
+
+  .episode-cycle-steps .episode-step:not(:last-child)::after,
+  .episode-loop > .episode-boundary::after {
+    content: "\2192";
+    position: absolute;
+    top: 42%;
+    right: clamp(-18px, -1.35vw, -13px);
+    color: var(--blue);
+    font: 700 15px/1 var(--mono);
+  }
+
+  .episode-step span {
+    color: var(--blue);
+    font: 600 var(--text-label)/1 var(--mono);
+  }
+
+  .episode-step strong {
+    margin: 6px 0 4px;
+    display: block;
+    font: 700 clamp(16px, 1.25vw, 19px)/1.1 var(--serif);
+  }
+
+  .episode-step p {
+    margin: 0;
+    color: var(--muted);
+    font-size: var(--text-small);
+    line-height: 1.35;
+  }
+
+  .episode-boundary {
+    border-color: color-mix(in srgb, var(--red) 48%, var(--line));
+    background: var(--red-soft);
+  }
+
+  .episode-boundary span {
+    color: var(--red);
+  }
+
+  .episode-continuation {
+    border-color: color-mix(in srgb, var(--blue) 48%, var(--line));
+  }
+
+  .task-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: clamp(14px, 2vw, 26px);
+  }
+
+  .task-card {
+    min-height: 178px;
+    padding: clamp(16px, 1.8vw, 24px);
+    border: 1px solid var(--line);
+    border-top: 4px solid var(--blue);
+    border-radius: 10px;
+    background: var(--card);
+  }
+
+  .task-card.cifar {
+    border-top-color: var(--red);
+  }
+
+  .task-card.cifar .task-number {
+    color: var(--red);
+  }
+
+  .task-card h3 {
+    margin: 8px 0 10px;
+  }
+
+  .task-card > p:not(.task-number) {
+    min-height: 2.8em;
+    margin: 0 0 12px;
+    color: var(--muted);
+    font-size: var(--text-body);
+    line-height: 1.4;
+  }
+
+  .task-card dl {
+    margin: 0;
+    display: grid;
+    gap: 7px;
+  }
+
+  .task-card dl div {
+    padding-top: 7px;
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    border-top: 1px solid var(--line);
+  }
+
+  .task-card dt {
+    color: var(--muted);
+    font: var(--text-label)/1.4 var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .task-card dd {
+    margin: 0;
+    font-weight: 650;
+    font-size: var(--text-small);
+  }
+
+  .figure-grid {
+    min-height: 0;
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: clamp(12px, 1.5vw, 20px);
+  }
+
+  .figure-grid-single {
+    width: 100%;
+    margin: 0 auto;
+    grid-template-columns: 1fr;
+  }
+
+  .trajectory-slide .slide-inner {
+    width: min(1280px, 96vw);
+  }
+
+  .curve-summary {
+    width: min(86%, 1050px);
+    margin: 0 auto clamp(10px, 1.5vh, 16px);
+    padding-left: 1.25em;
+    color: var(--muted);
+    font-size: var(--text-body);
+    line-height: 1.4;
+  }
+
+  .curve-insight {
+    width: min(86%, 1050px);
+    margin: 0 auto clamp(10px, 1.5vh, 16px);
+    padding: clamp(12px, 1.2vw, 16px) clamp(16px, 1.6vw, 22px)
+      clamp(12px, 1.2vw, 16px) clamp(34px, 3vw, 44px);
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 5px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--card);
+    color: var(--muted);
+    font-size: var(--text-body);
+    line-height: 1.35;
+  }
+
+  .curve-insight strong {
+    color: var(--ink);
+  }
+
+  .curve-summary li + li {
+    margin-top: 5px;
+  }
+
+  .curve-summary strong {
+    color: var(--ink);
+  }
+
+  .figure-grid-single .figure-card {
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .figure-card,
+  .reset-figure {
+    min-width: 0;
+    margin: 0;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--card);
+  }
+
+  .figure-card img {
+    width: 100%;
+    min-height: 0;
+    flex: 1;
+    object-fit: contain;
+  }
+
+  figcaption {
+    margin-top: 8px;
+    color: var(--muted);
+    font-size: var(--text-small);
+    line-height: 1.35;
+  }
+
+  figcaption strong {
+    color: var(--ink);
+  }
+
+  .reset-layout {
+    min-height: 0;
+    flex: 1;
+    display: grid;
+    grid-template-columns: minmax(300px, 0.83fr) minmax(440px, 1.17fr);
+    gap: clamp(18px, 3vw, 40px);
+  }
+
+  .reset-story {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .reset-definition {
+    margin: 0;
+    padding: 13px 16px;
+    color: var(--muted);
+    border-left: 3px solid var(--blue);
+    background: var(--blue-soft);
+    font-size: var(--text-body);
+    line-height: 1.35;
+  }
+
+  .reset-definition strong {
+    color: var(--ink);
+  }
+
+  .fork-design {
+    padding: clamp(14px, 1.6vw, 20px);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--card);
+    text-align: center;
+  }
+
+  .incumbent {
+    margin: 0;
+    font: 650 var(--text-body)/1.3 var(--serif);
+  }
+
+  .fork-line {
+    position: relative;
+    width: calc(50% + 6px);
+    height: 24px;
+    margin: 4px auto 0;
+    background:
+      linear-gradient(var(--muted), var(--muted)) center top / 1px 50% no-repeat,
+      linear-gradient(var(--muted), var(--muted)) center 50% / 100% 1px no-repeat;
+  }
+
+  .fork-line::before,
+  .fork-line::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    bottom: 0;
+    width: 1px;
+    background: var(--muted);
+  }
+
+  .fork-line::before {
+    left: 0;
+  }
+
+  .fork-line::after {
+    right: 0;
+  }
+
+  .fork-arms {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .arm {
+    padding: 11px;
+    border-radius: 7px;
+  }
+
+  .arm span,
+  .arm small {
+    display: block;
+  }
+
+  .arm span {
+    font: 700 17px/1.2 var(--serif);
+  }
+
+  .arm small {
+    margin-top: 3px;
+    color: var(--muted);
+    font-size: var(--text-small);
+  }
+
+  .continue {
+    color: var(--blue);
+    background: var(--blue-soft);
+  }
+
+  .reset {
+    color: var(--red);
+    background: var(--red-soft);
+  }
+
+  .equal-budget {
+    margin: 14px 0 0;
+    color: var(--muted);
+    font: var(--text-label)/1.4 var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .result-grid {
+    margin-top: 16px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 9px;
+  }
+
+  .result-grid div {
+    padding: clamp(10px, 1.3vw, 16px);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card);
+  }
+
+  .result-grid strong,
+  .result-grid span {
+    display: block;
+  }
+
+  .result-grid strong {
+    color: var(--red);
+    font: 700 clamp(21px, 2.1vw, 31px)/1 var(--serif);
+  }
+
+  .result-grid span {
+    margin-top: 5px;
+    color: var(--muted);
+    font-size: var(--text-small);
+  }
+
+  .reset-figure {
+    min-height: 0;
+  }
+
+  .reset-figure img {
+    width: 100%;
+    min-height: 0;
+    flex: 1;
+    object-fit: contain;
+  }
+
+  .model-layout {
+    min-height: 0;
+    flex: 1;
+    display: grid;
+    grid-template-columns: minmax(440px, 1.05fr) minmax(430px, 0.95fr);
+    gap: clamp(18px, 3vw, 40px);
+  }
+
+  .model-figure-column {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .performance-model {
+    min-height: 0;
+    padding: clamp(18px, 2vw, 28px);
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--card);
+  }
+
+  .model-notes {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .model-notes p {
+    margin: 0;
+    color: var(--muted);
+    font: 600 var(--text-label)/1.3 var(--mono);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .model-notes .wip-copy {
+    color: var(--gold);
+  }
+
+  .performance-curves {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .performance-curves .axis {
+    stroke: var(--ink);
+    stroke-width: 1.5;
+  }
+
+  .performance-curves text {
+    font-family: var(--mono);
+  }
+
+  .axis-label,
+  .target-label,
+  .reset-label,
+  .retained-label,
+  .branch-label {
+    fill: var(--muted);
+    font-size: 16px;
+  }
+
+  .branch-label {
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+
+  .continue-label {
+    fill: var(--blue);
+  }
+
+  .reset-branch-label {
+    fill: var(--green);
+  }
+
+  .target-line {
+    stroke: var(--gold);
+    stroke-width: 1.5;
+    stroke-dasharray: 6 6;
+  }
+
+  .target-label {
+    fill: var(--gold);
+    font-weight: 700;
+  }
+
+  .proposal-points {
+    opacity: 0.72;
+  }
+
+  .continue-points {
+    fill: var(--blue);
+  }
+
+  .reset-points {
+    fill: var(--green);
+  }
+
+  .record-curve {
+    fill: none;
+    stroke-width: 4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .continue-record {
+    stroke: var(--blue);
+  }
+
+  .reset-record {
+    stroke: var(--green);
+  }
+
+  .reset-boundary {
+    stroke: var(--red);
+    stroke-width: 2;
+    stroke-dasharray: 6 6;
+  }
+
+  .reset-label {
+    fill: var(--red);
+    font-weight: 700;
+  }
+
+  .retained-label {
+    fill: var(--green);
+    font-weight: 700;
+  }
+
+  .curve-legend {
+    margin-top: 8px;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+  }
+
+  .curve-legend span {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--muted);
+    font-size: var(--text-small);
+  }
+
+  .curve-legend i {
+    width: 18px;
+    height: 0;
+    display: inline-block;
+    border-top: 3px solid var(--blue);
+  }
+
+  .curve-legend .proposal-key {
+    width: 7px;
+    height: 7px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--blue);
+  }
+
+  .curve-legend .reset-key {
+    border-top-color: var(--red);
+    border-top-style: dashed;
+  }
+
+  .model-cards {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .model-cards article {
+    padding: clamp(16px, 1.8vw, 24px);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--card);
+  }
+
+  .model-cards .decision-card {
+    border-color: color-mix(in srgb, var(--red) 35%, var(--line));
+    background: var(--red-soft);
+  }
+
+  .model-cards .prediction-card {
+    border-color: color-mix(in srgb, var(--green) 35%, var(--line));
+  }
+
+  .prediction-card ul {
+    margin: 12px 0 0;
+    padding-left: 1.25em;
+    color: var(--muted);
+    font-size: var(--text-body);
+    line-height: 1.4;
+  }
+
+  .prediction-card li + li {
+    margin-top: 8px;
+  }
+
+  .prediction-card li::marker {
+    color: var(--green);
+  }
+
+  .equation {
+    margin: clamp(11px, 1.6vh, 18px) 0 9px;
+    color: var(--ink);
+    font: 600 clamp(16px, 1.7vw, 24px)/1.3 var(--serif);
+  }
+
+  .equation-stack {
+    display: grid;
+    gap: 4px;
+  }
+
+  .model-cards p:last-child {
+    margin: 0;
+    color: var(--muted);
+    font-size: var(--text-body);
+    line-height: 1.4;
+  }
+
+  .policy-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: clamp(10px, 1.3vw, 17px);
+  }
+
+  .policy-grid article {
+    min-height: 275px;
+    padding: clamp(17px, 1.8vw, 24px);
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--line);
+    border-top: 3px solid var(--blue);
+    border-radius: 9px;
+    background: var(--card);
+  }
+
+  .policy-grid article:nth-child(2) {
+    border-top-color: var(--red);
+  }
+
+  .policy-grid article:nth-child(3) {
+    border-top-color: var(--green);
+  }
+
+  .policy-grid h3 {
+    margin: 8px 0 12px;
+  }
+
+  .policy-grid article > p:not(.policy-number) {
+    margin: 0;
+    color: var(--muted);
+    font-size: var(--text-body);
+    line-height: 1.45;
+  }
+
+  .policy-flow {
+    margin-top: auto;
+    padding-top: 15px;
+    color: var(--blue);
+    border-top: 1px solid var(--line);
+    font: var(--text-small)/1.4 var(--mono);
+  }
+
+  .speaker-notes {
+    display: none;
+  }
+
+  body[data-notes="true"] .speaker-notes {
+    position: absolute;
+    z-index: 4;
+    right: 5vw;
+    bottom: 6vh;
+    width: min(440px, 40vw);
+    padding: 15px 17px;
+    display: block;
+    color: #f2f4f8;
+    border-radius: 8px;
+    background: color-mix(in srgb, #111820 94%, transparent);
+    box-shadow: 0 12px 40px rgb(0 0 0 / 22%);
+    font-size: 16px;
+    line-height: 1.45;
+  }
+
+  .speaker-notes strong {
+    display: block;
+    margin-bottom: 5px;
+    color: #9db4ff;
+    font-family: var(--mono);
+  }
+
+  .progress {
+    position: fixed;
+    z-index: 11;
+    top: 47px;
+    left: 0;
+    width: 100%;
+    height: 2px;
+  }
+
+  .progress span {
+    width: 20%;
+    height: 100%;
+    display: block;
+    background: var(--blue);
+    transition: width 180ms ease;
+  }
+
+  .deck-controls {
+    position: fixed;
+    z-index: 12;
+    right: 3vw;
+    bottom: 18px;
+    padding: 5px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--card) 92%, transparent);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 7px 24px rgb(20 30 40 / 8%);
+  }
+
+  .deck-controls button {
+    min-width: 34px;
+    height: 30px;
+    padding: 0 9px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    cursor: pointer;
+    font: 12px/1 var(--mono);
+  }
+
+  .deck-controls button:hover,
+  .deck-controls button:focus-visible {
+    color: var(--blue);
+    background: var(--blue-soft);
+  }
+
+  .deck-controls button:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+
+  #slide-status {
+    min-width: 48px;
+    color: var(--muted);
+    font: 12px/1 var(--mono);
+    text-align: center;
+  }
+
+  .keyboard-help {
+    position: fixed;
+    z-index: 9;
+    bottom: 22px;
+    left: 3vw;
+    margin: 0;
+    display: flex;
+    gap: 16px;
+    color: var(--muted);
+    font: 11px/1 var(--mono);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #13181e;
+      --card: #1b222a;
+      --ink: #edf0f3;
+      --muted: #9aa5b1;
+      --line: #303943;
+      --blue: #88a3ff;
+      --blue-soft: #253252;
+      --red: #ed8b70;
+      --red-soft: #422a28;
+      --green: #52aa89;
+      --gold: #d3a24c;
+    }
+
+  }
+
+  @media (max-width: 760px), (max-height: 600px) {
+    body {
+      overflow: auto;
+    }
+
+    .deck-header,
+    .keyboard-help {
+      display: none;
+    }
+
+    .progress {
+      top: 0;
+    }
+
+    .slide {
+      min-height: 100svh;
+      padding: 28px 18px 72px;
+      place-items: start center;
+    }
+
+    .slide-inner {
+      width: 100%;
+      height: auto;
+      min-height: calc(100svh - 100px);
+    }
+
+    .slide-heading {
+      align-items: start;
+    }
+
+    .timing {
+      display: none;
+    }
+
+    .task-grid,
+    .figure-grid,
+    .reset-layout,
+    .model-layout,
+    .policy-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .episode-loop {
+      grid-template-columns: 1fr;
+    }
+
+    .episode-cycle-steps {
+      grid-template-columns: 1fr;
+    }
+
+    .episode-cycle::after,
+    .episode-cycle-steps .episode-step:not(:last-child)::after,
+    .episode-loop > .episode-boundary::after {
+      content: "\2193";
+      top: auto;
+      right: 50%;
+      bottom: -17px;
+    }
+
+    .task-card,
+    .policy-grid article {
+      min-height: auto;
+    }
+
+    .figure-card {
+      min-height: 280px;
+    }
+
+    .reset-layout,
+    .model-layout {
+      flex: none;
+    }
+
+    .model-cards {
+      grid-template-columns: 1fr;
+    }
+
+    .model-cards .decision-card {
+      grid-column: auto;
+    }
+
+    .closing {
+      align-items: start;
+      flex-direction: column;
+    }
+
+    .deck-controls {
+      right: 10px;
+      bottom: 10px;
+    }
+
+    .deck-controls #toggle-notes,
+    .deck-controls #toggle-fullscreen {
+      display: none;
+    }
+  }
+
+  @media print {
+    @page {
+      size: 16in 9in;
+      margin: 0;
+    }
+
+    body {
+      overflow: visible;
+      background: white;
+      print-color-adjust: exact;
+    }
+
+    .deck-header,
+    .deck-controls,
+    .keyboard-help,
+    .progress,
+    .skip-link,
+    .speaker-notes {
+      display: none !important;
+    }
+
+    .deck {
+      height: auto;
+      overflow: visible;
+    }
+
+    .slide {
+      width: 16in;
+      height: 9in;
+      min-height: 9in;
+      padding: 0.65in;
+      break-after: page;
+      page-break-after: always;
+    }
+
+    .slide-inner {
+      width: 100%;
+      height: 100%;
+    }
+  }
+</style>

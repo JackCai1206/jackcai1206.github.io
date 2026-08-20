@@ -1,0 +1,266 @@
+---
+import Callout from "../../components/report/Callout.astro";
+import TableOfContents from "../../components/report/TableOfContents.astro";
+import ReportLayout from "../../layouts/ReportLayout.astro";
+---
+
+<ReportLayout
+  title="Spotting Problems for Auto Research"
+  description="Good auto-research problems pair a wide, combinatorial design space with evaluation that is cheap, robust, and aligned."
+  eyebrow="Research note · automated research"
+  publishedAt="2026-07-20"
+  status="Working draft"
+>
+  <TableOfContents slot="toc">
+    <li><a href="#hook"><span class="n">&sect;</span>The optimizer gap</a></li>
+    <li><a href="#thesis"><span class="n">&sect;</span>The thesis</a></li>
+    <li><a href="#s0"><span class="n">0</span>Wide and combinatorial</a></li>
+    <li><a href="#s1"><span class="n">1</span>Cheap evaluation</a></li>
+    <li><a href="#s2"><span class="n">2</span>Robust evaluation</a></li>
+    <li><a href="#s3"><span class="n">3</span>Aligned evaluation</a></li>
+    <li><a href="#architecture-note"><span class="n">Ex</span>Architecture research</a></li>
+    <li><a href="#s4"><span class="n">4</span>The conjunction</a></li>
+  </TableOfContents>
+
+  <section id="hook">
+    <h2><span class="secno">&sect;</span>Coding agents are optimizers, not question-formulators</h2>
+    <p>
+      Give a strong coding agent an objective it can measure, and it starts to look like a
+      <strong>universal optimizer</strong>. It can write code, run experiments, read failures, revise
+      its approach, and keep descending on the objective for as long as we can afford. It is already
+      surprisingly good at the part of research that begins with: <em>make this number better</em>.
+    </p>
+    <p>
+      What it is much less reliable at is deciding <em>which number should be better</em>. Formulating
+      the right question, choosing a faithful proxy, and noticing that the objective itself is wrong
+      still require judgment that optimization cannot supply. The near-term opportunity for
+      auto-research is therefore not to ask agents to invent research agendas from nothing. It is to
+      find problems where humans can formulate the question and agents can scale the search for an
+      answer.
+    </p>
+  </section>
+
+  <section id="thesis">
+    <h2><span class="secno">&sect;</span>The thesis</h2>
+    <p>
+      A good auto-research problem has an <strong>NP-like shape</strong>: finding a strong candidate
+      requires searching a wide space of interacting design choices, but checking a candidate is
+      much easier than discovering it. This is an analogy about the shape of the workflow, not a
+      formal complexity classification.
+    </p>
+    <p>
+      That asymmetry is what makes parallel agents useful. Once part of research becomes explicit
+      candidate generation followed by repeatable verification, we can spend more compute exploring
+      branches. But breadth alone is not enough: the evaluator has to be cheap enough to call often,
+      robust enough to trust, and aligned with the actual research objective.
+    </p>
+    <Callout label="Working thesis">
+      <p>
+        The strongest auto-research problems combine four properties:
+        <strong>a wide, combinatorial design space; cheap evaluation; robust evaluation; and aligned
+        evaluation.</strong> Each property is necessary, and each deserves its own design discipline.
+      </p>
+    </Callout>
+
+    <div class="protos">
+      <article class="proto">
+        <h3>0 · Wide and combinatorial</h3>
+        <p>There are many plausible branches, and the value of one choice depends on other choices.</p>
+      </article>
+      <article class="proto">
+        <h3>1 · Cheap</h3>
+        <p>Candidates can be evaluated frequently enough to support broad, iterative search.</p>
+      </article>
+      <article class="proto">
+        <h3>2 · Robust</h3>
+        <p>The score survives reruns, perturbations, and held-out cases instead of rewarding noise.</p>
+      </article>
+      <article class="proto">
+        <h3>3 · Aligned</h3>
+        <p>Higher scores correspond to research outcomes we actually care about.</p>
+      </article>
+    </div>
+  </section>
+
+  <section id="s0">
+    <h2><span class="secno">0</span>Wide and combinatorial design space</h2>
+    <p>
+      Auto-research has leverage when progress depends on choosing among many hypotheses,
+      representations, algorithms, experimental settings, and ways of combining them. The space
+      should be too broad to enumerate comfortably and too interaction-heavy for one local gradient
+      to settle the question. A single idea may look weak alone but become strong in combination
+      with two others.
+    </p>
+    <p>
+      This is the search side of the NP-like analogy. Parallelism buys coverage only when branches
+      actually explore different regions; launching many agents that inherit the same assumptions
+      merely reproduces one trajectory at greater cost.
+    </p>
+    <h3>Questions for this section</h3>
+    <ul>
+      <li>How can we tell genuine combinatorial structure from ordinary parameter tuning?</li>
+      <li>How should agents partition the space without prematurely excluding strange ideas?</li>
+      <li>How do we preserve useful discoveries while keeping branches behaviorally diverse?</li>
+    </ul>
+  </section>
+
+  <section id="s1">
+    <h2><span class="secno">1</span>Cheap evaluation</h2>
+    <p>
+      Search scales only if feedback is inexpensive relative to generating the next candidate.
+      Cheap means more than low dollar cost: evaluation must also have low wall-clock latency, low
+      setup overhead, and minimal dependence on scarce human attention. The relevant quantity is the
+      marginal cost of one more trustworthy comparison.
+    </p>
+    <p>
+      Cheap evaluation creates a tight loop: propose, test, retain the useful artifact, and branch
+      again. If every verdict requires a week-long experiment or an expert panel, parallel candidate
+      generation only moves the bottleneck downstream.
+    </p>
+    <h3>Cheap does not mean compute-starved</h3>
+    <p>
+      Each iteration has at least two compute budgets: one for producing the candidate and one for
+      verifying it. The ambition and quality of the resulting artifact probably scale with the
+      first. With more compute inside an iteration, an agent can test deeper changes, run broader
+      ablations, optimize implementations, and explore ideas whose value is not visible in a toy
+      prototype. A tiny generation budget systematically favors ideas that are easy to demonstrate,
+      not necessarily ideas that are best.
+    </p>
+    <p>
+      Verification compute has a floor as well. If the verifier is too weak, it becomes hackable:
+      shallow tests reward shortcuts, small workloads hide scaling failures, and trivial solutions
+      can look competitive. The target is therefore not the cheapest possible evaluation, but the
+      cheapest evaluation that remains robust and aligned under optimization pressure.
+    </p>
+    <Callout label="Scaling claim">
+      <p>
+        Scale compute <strong>inside each agent iteration</strong>, not only the number of agents,
+        outer-loop iterations, or hours of human attention. Candidate-generation compute and
+        verification compute should grow together.
+      </p>
+    </Callout>
+    <h3>Questions for this section</h3>
+    <ul>
+      <li>Can evaluation be staged, with cheap screens before expensive confirmation?</li>
+      <li>What should be cached or shared across branches to lower marginal cost?</li>
+      <li>When does evaluator throughput, rather than agent intelligence, become the binding limit?</li>
+      <li>How does artifact quality scale with compute available inside one iteration?</li>
+      <li>What minimum verification budget prevents shortcuts from dominating the search?</li>
+    </ul>
+  </section>
+
+  <section id="s2">
+    <h2><span class="secno">2</span>Robust evaluation</h2>
+    <p>
+      A cheap score is useful only if it is stable enough to guide search. Robust evaluation gives
+      similar judgments across reruns, seeds, environments, and reasonable perturbations. It should
+      distinguish real improvements from measurement noise and brittle tricks that happen to pass
+      one test.
+    </p>
+    <p>
+      At scale, even small evaluator weaknesses become optimization targets. A broad search will
+      eventually find lucky noise, leakage, and edge cases. Robustness therefore includes
+      replication, held-out tests, uncertainty estimates, and adversarial checks—not merely a
+      deterministic script.
+    </p>
+    <h3>Questions for this section</h3>
+    <ul>
+      <li>How many reruns are needed before a branch earns more budget?</li>
+      <li>Which perturbations expose overfitting without making evaluation prohibitively expensive?</li>
+      <li>How should uncertainty propagate into branch selection?</li>
+    </ul>
+  </section>
+
+  <section id="s3">
+    <h2><span class="secno">3</span>Aligned evaluation</h2>
+    <p>
+      Alignment asks whether the evaluator ranks candidates by the outcome the research is actually
+      trying to produce. A metric can be cheap, repeatable, and completely wrong. Once agents can
+      search broadly, Goodhart&rsquo;s law stops being a warning at the margin and becomes the default
+      behavior of the system.
+    </p>
+    <p>
+      Aligned evaluation may require multiple objectives, hard constraints, hidden validation sets,
+      or periodic human judgment. The goal is not a perfect scalar representation of scientific
+      value. It is a selection rule whose improvements remain meaningful when optimization pressure
+      becomes much stronger than it was during benchmark design.
+    </p>
+    <h3>Questions for this section</h3>
+    <ul>
+      <li>What failure would score well while violating the real objective?</li>
+      <li>Which important qualities are missing because they are difficult to measure?</li>
+      <li>How often should human or downstream reality checks recalibrate the evaluator?</li>
+    </ul>
+  </section>
+
+  <section id="architecture-note">
+    <h2><span class="secno">Ex</span>Architecture research and the reoptimization valley</h2>
+    <p>
+      Architecture research is a useful stress test for this framework. It is hard to formulate an
+      objective that directly rewards algorithmic innovation. If the objective is immediate
+      end-to-end performance, a genuinely new paradigm begins at a severe disadvantage: the
+      incumbent has already been co-optimized with compilers, kernels, memory systems, accelerators,
+      and distributed training stacks.
+    </p>
+    <p>
+      A large paradigm shift must first pay a <strong>reoptimization cost</strong>. The search has to
+      adapt the algorithm to current hardware, find and remove immature implementation bottlenecks,
+      and often redesign surrounding systems before the underlying idea can be compared fairly.
+      Direct objective descent will usually reject the idea while it is still crossing this valley,
+      unless the search has a strong bias or protected budget for algorithmic novelty.
+    </p>
+    <Callout label="Rough notes to develop">
+      <ul>
+        <li>
+          Mature baselines carry years of hardware and software co-optimization; new algorithms are
+          evaluated before receiving the same treatment.
+        </li>
+        <li>
+          A novelty prior, protected exploration budget, or staged evaluator may be necessary to
+          keep paradigm shifts alive long enough to reveal their potential.
+        </li>
+        <li>
+          Early inefficiency may be implementation debt rather than a fundamental weakness, so a
+          single end-to-end score can be prematurely hostile to innovation.
+        </li>
+        <li>
+          The awkward possibility must remain visible: some algorithms simply do not parallelize
+          well, map cleanly to hardware, or produce real speedups after fair reoptimization.
+        </li>
+      </ul>
+    </Callout>
+    <h3>The evaluator-design problem</h3>
+    <p>
+      The hard question is how to distinguish a temporary ecosystem tax from a structural mismatch.
+      A useful architecture evaluator may need stages: first test algorithmic promise and scaling
+      behavior, then estimate engineering headroom and hardware compatibility, and only later demand
+      end-to-end speedup. Too little bias locks search into the current paradigm; too much bias keeps
+      elegant but impractical ideas alive forever.
+    </p>
+    <ul>
+      <li>What evidence justifies paying the cost to reoptimize a new architecture?</li>
+      <li>Which inefficiencies are contingent on today&rsquo;s implementation or hardware?</li>
+      <li>Which failures reveal fundamental limits to parallelism or achievable speedup?</li>
+      <li>How should novelty and realized performance trade off as evidence accumulates?</li>
+    </ul>
+  </section>
+
+  <section id="s4">
+    <h2><span class="secno">4</span>The conjunction matters</h2>
+    <p>
+      These four features multiply rather than substitute for one another. A narrow space does not
+      need massive search. An expensive evaluator starves the loop. A noisy evaluator selects luck.
+      A misaligned evaluator efficiently discovers the wrong answer. The promising case is the
+      conjunction: difficult discovery, easy-enough verification, trustworthy comparisons, and a
+      score that points toward the real objective.
+    </p>
+    <Callout label="Problem-selection checklist">
+      <ul>
+        <li>Can many meaningfully different candidates be generated and combined?</li>
+        <li>Can each candidate receive feedback cheaply and quickly?</li>
+        <li>Will that feedback survive replication and perturbation?</li>
+        <li>Would optimizing it aggressively still move the research goal forward?</li>
+      </ul>
+    </Callout>
+  </section>
+</ReportLayout>

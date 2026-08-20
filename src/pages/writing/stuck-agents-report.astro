@@ -1,0 +1,381 @@
+---
+import TableOfContents from "../../components/report/TableOfContents.astro";
+import ReportLayout from "../../layouts/ReportLayout.astro";
+---
+
+<ReportLayout
+  title="Stuck Agents: Optimization Plateaus and the Case for Context Resets"
+  description="Fleets of LLM coding agents produce research-grade artifacts, then get stuck. Keeping the code and dropping the conversation can break plateaus that continuation does not."
+  eyebrow="Empirical study · long-horizon agentic optimization"
+  publishedAt="2026-07-01"
+  status="Living report"
+>
+  <div slot="meta" class="keyline">
+    <span><span class="sw sw--continue"></span><b>continue</b> = keep conversation</span>
+    <span><span class="sw sw--reset"></span><b>reset</b> = keep artifact, blank conversation</span>
+    <span>agent: GitHub&nbsp;Copilot&nbsp;CLI · gpt&#8209;5.5 · xhigh</span>
+    <span>x&#8209;axis everywhere: <b>credits</b> (billed compute)</span>
+    <span><a href="/presentations/research-agent-resets/">5-minute presentation →</a></span>
+    <span class="report-meta-note">● living report — sections marked “data incoming” update as runs complete</span>
+  </div>
+
+  <TableOfContents slot="toc">
+    <li><a href="#s0"><span class="n">0</span>{" "}Background &amp; tasks</a></li>
+    <li><a href="#s1"><span class="n">1</span>{" "}Trajectories &amp; artifacts</a></li>
+    <li><a href="#s2"><span class="n">2</span>{" "}Three regularities</a></li>
+    <li><a href="#s3"><span class="n">3</span>{" "}The reset intervention</a></li>
+    <li><a href="#s4"><span class="n">4</span>{" "}Advanced interventions</a></li>
+    <li><a href="#s5"><span class="n">5</span>{" "}Why resets work</a></li>
+    <li><a href="#refs"><span class="n">§</span>{" "}References &amp; repro</a></li>
+  </TableOfContents>
+
+<section id="s0">
+  <h2><span class="secno">0</span>{" "}Background &amp; task descriptions</h2>
+  <p>We run fleets of independent LLM coding-agent sessions (&ldquo;seeds&rdquo;) on optimization tasks with a
+  hidden numeric grader: the agent edits a workspace, submits, receives a score, and keeps going inside one
+  persistent conversation until a fixed <b>credit budget</b> (billed model compute) is exhausted. All progress
+  curves in this report are plotted against <em>cumulative credits</em>.</p>
+  <ul>
+    <li><b>Kernel take-home.</b> Optimize a compute kernel for a simulated architecture; score is{" "}
+    <em>cycles, lower is better</em>, measured by a hardened, cheat-proofed grader. The task comes from a real
+    hiring take-home; task materials report a best human score of 950, while the best
+    {" "}<em>open-source</em> human solution scores 1157. Fleet: 8 seeds &times; ~105K credits.</li>
+    <li><b>tinyCIFAR gz-golf.</b> Ship a self-contained artifact that trains/loads a CIFAR-10 classifier;
+    score is a <em>merit</em> that rewards sealed-test accuracy and penalizes gzipped artifact size.
+    The brief &mdash; 94% at 45&nbsp;KB &mdash; defines a hard threshold at merit 0.575. Grading is against a
+    sealed 10k test set. Fleet: 8 independent seeds at ~31&ndash;68K trace-accounted credits, plus one
+    correlated seed-1 restart retained only as a recovery case study.</li>
+  </ul>
+  <p class="muted">Both tasks are &ldquo;wide&rdquo;: many families of approaches, real headroom, no way to
+  reward-hack the number &mdash; a fair proxy for agentic research work, where <em>getting stuck</em> is a
+  measurable phenomenon rather than an artifact of a toy task.</p>
+</section>
+
+<section id="s1">
+  <h2><span class="secno">1</span>{" "}Trajectories: real artifacts, then a long grind</h2>
+  <p>Every seed follows the same arc: a violent early descent, then an ever-slower grind punctuated by rare
+  jumps. Dots are <em>individual graded submissions</em>; lines are best-so-far. The linear view shows that
+  most of the budget is spent on a near-flat tail; the log&ndash;log view shows the descent is smooth and
+  lawful &mdash; not a wall.</p>
+
+  <figure>
+    <div class="imgbox"><img src="/writing/fig_traj_kernel.png" alt="fig_traj_kernel.png"></div>
+    <figcaption><b>Kernel fleet, 8 seeds.</b> Left: linear credits, zoomed to the 800&ndash;2,600-cycle band where
+    the entire second half of the campaign plays out. Right: log&ndash;log over the working range (all seeds descend from the 147,734-cycle task baseline within
+    their first few hundred credits; trivial identity-kernel submissions are excluded). Green/gold dashed:
+    best open-source human (1157) and leaderboard #1 (950). The submission clouds show experimentation never stops
+    &mdash; scores keep scattering upward even while best-so-far is flat.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="imgbox"><img src="/writing/fig_traj_cifar.png" alt="fig_traj_cifar.png"></div>
+    <figcaption><b>tinyCIFAR fleet, 8 independent seeds.</b> Merit vs credits, linear and log-x. Green dashed: the brief
+    (94% @ 45&nbsp;KB &rArr; merit 0.575). One seed (r7) crosses on its own; the rest plateau below it at heights
+    that vary 3&times; across seeds. Dots at merit&nbsp;0 are failed/rejected submissions. The dashed black curve
+    is an archived seed-1 restart: it shares an inherited workspace prefix with the canonical r1 lineage, so it
+    is not counted as an independent seed; its x-axis charges that ~7.7K-credit prefix. Hollow points and dotted
+    vertical endpoints show post-trace tail outcomes at the final known credit coordinate: their true x-values
+    are larger but unknown, so these markers are lower bounds and are excluded from quantitative fits.</figcaption>
+  </figure>
+
+  <h3>The artifacts are genuinely good</h3>
+  <ul>
+    <li><b>Kernel:</b> campaign record <b>1068 cycles</b> (produced by a reset fork, &sect;3) &mdash; better than
+    the best open-source human solution (1157).
+    The record run&rsquo;s method: the fleet-shared vectorized skeleton, with the edge coming from instruction scheduling and engine balancing
+    &mdash; the agent wrote an offline beam-search over schedules (<code>cross_beam.py</code>) and ran it
+    against the simulator rather than hand-editing kernels.</li>
+    <li><b>tinyCIFAR:</b> two of 20 reset forks crossed the hard brief; the best reset artifact reached{" "}
+    <b>94.07% sealed-test accuracy in 39.69&nbsp;KB</b> (merit 0.616 vs brief 0.575), narrowly above the best
+    uninterrupted baseline artifact (94.14% at 41.31&nbsp;KB, merit 0.612). Method: a compact convnet
+    with quantized, gzip-friendly weights &mdash; and crucially, the winning move was <em>abandoning</em> the
+    large-checkpoint strategy (~130&ndash;150&nbsp;KB) and rebuilding small, not compressing the incumbent harder.</li>
+  </ul>
+</section>
+
+<section id="s2">
+  <h2><span class="secno">2</span>{" "}Three regularities of the grind</h2>
+
+  <p><b>1&nbsp;&middot;&nbsp;The fleet mean is a log-sigmoid.</b> Averaging seeds yields a clean 4-parameter
+  logistic in log-credits with a finite implied floor &mdash; on both tasks &mdash; even though no individual
+  seed looks sigmoid.</p>
+  <figure>
+    <div class="imgbox"><img src="/writing/fig2_fit_both.png" alt="fig2_fit_both.png"></div>
+    <figcaption><b>Fleet mean + log-sigmoid fit.</b> Kernel (left): geo-mean of 8 seeds, R&sup2;=0.997, implied
+    floor &asymp;1,113 cycles. tinyCIFAR (right): mean of 8 independent seeds, R&sup2;=0.996, implied plateau &asymp;0.398
+    merit &mdash; well below the 0.575 brief. Grey: individual seeds. Note (&sect;3): interventions later{" "}
+    <em>break</em> these floors &mdash; they are properties of the uninterrupted fleet, not of the task.</figcaption>
+  </figure>
+
+  <p><b>2&nbsp;&middot;&nbsp;Spread across seeds does not shrink.</b> If seeds were converging on one answer,
+  the cross-seed band would close with budget. It does not.</p>
+  <figure>
+    <div class="imgbox"><img src="/writing/fig2_spread_both.png" alt="fig2_spread_both.png"></div>
+    <figcaption><b>10&ndash;90% cross-seed band (blue) and its width (red).</b> Kernel: width stays a roughly
+    constant fraction of the median across two decades of credits. tinyCIFAR: the band never closes.
+    More budget buys a better middle, not agreement.</figcaption>
+  </figure>
+
+  <p><b>3&nbsp;&middot;&nbsp;Ranking is unstable.</b> The seed that leads early is not the one that wins.</p>
+  <figure>
+    <div class="imgbox"><img src="/writing/fig_rank_bump.png" alt="fig_rank_bump.png"></div>
+    <figcaption><b>Rank of each seed at credit checkpoints (1 = best).</b> Kernel: the 1K-credit leader (k7)
+    finishes 3rd; the eventual winner (k3) climbs from rank 8 at 15K. tinyCIFAR: the eventual winner (r7) sat
+    at rank 6 at 1K while r5 led &mdash; r7&rsquo;s decisive jump lands between 1K and 2K, after which it holds;
+    the mid-pack keeps trading places to the end. Seeds not yet graded at a checkpoint rank last.</figcaption>
+  </figure>
+  <div class="callout">Sigmoid <em>mean</em>, non-shrinking <em>spread</em>, unstable <em>ranks</em>: exactly what
+  a <b>mixture of heterogeneous basins</b> produces &mdash; and hard to get from one shared learning curve plus
+  noise. &sect;5 makes that argument constructive. First, the intervention it motivates.</div>
+
+  <div class="incoming"><span class="tag">&#10003; replication complete</span>{" "}
+  <b>Long-context replication:</b> everything above was measured with the agent&rsquo;s conversation
+  auto-compacting at ~218K tokens (~200K of conversation; the fleets compacted 22&ndash;28&times; per seed
+  &mdash; verified from session compaction events). A completed 8-seed cifar baseline fleet at the{" "}
+  <code>long_context</code> tier (compaction at ~738K, 3.4&times;) tests how much of the plateau structure is
+  compaction-dependent. Its best merit was 0.526; none of the eight crossed the 0.575 brief.</div>
+</section>
+
+<section id="s3">
+  <h2><span class="secno">3</span>{" "}The reset intervention: keep the code, drop the context</h2>
+  <p>Fork a stuck run at its plateau into two arms with <em>identical budgets</em>:{" "}
+  <span class="cont">continue</span> resumes the same conversation on the same workspace;
+  {" "}<span class="reset">reset</span> keeps the exact same workspace/artifact but starts a <em>blank</em>{" "}
+  conversation &mdash; strictly less information: no notes, no summary, no hints. Any difference between the
+  arms is the causal effect of the accumulated context.</p>
+
+  <h3>3.1 tinyCIFAR &mdash; 9 branch points across 8 seeds</h3>
+  <figure>
+    <div class="imgbox"><img src="/writing/fig4_cifar_forks.png" alt="fig4_cifar_forks.png"></div>
+    <figcaption><b>All nine branch points, fork credits on x.</b> Each panel is re-centered at its own starting
+    incumbent, so the y-axis is absolute merit gain from that branch&rsquo;s baseline. Mean{" "}
+    <span class="reset">reset</span> performance exceeds <span class="cont">continue</span> at 5 of 9 branch
+    points and ties at 4, for an average advantage of +0.027 merit. Among the eight branches that begin below
+    the fixed brief, 2/20 reset forks reach it versus 0/20 continuation forks. Bottom-right shows the associated
+    artifact-size outcomes. Fork credit clocks are
+    reconstructed as in the kernel loader (authoritative totals over gap-capped active time).</figcaption>
+  </figure>
+  <p class="muted">Complete: all 44 forks ran to full budget. Effects are heterogeneous: four branch points
+  tie, while five favor reset by +0.005 to +0.091 mean merit.</p>
+
+  <h3>3.2 Kernel &mdash; 12 branch points across the hot&rarr;cold gradient</h3>
+  <figure>
+    <div class="imgbox"><img src="/writing/fig4_kernel_forks.png" alt="fig4_kernel_forks.png"></div>
+    <figcaption><b>Top: per-branch curves</b> (3 <span class="cont">continue</span> +
+    3 <span class="reset">reset</span> forks each, budget-matched; dashed grey = the branch&rsquo;s incumbent;
+    gold titles = the three added late branches). At the cold-but-escapable branch{" "}
+    <code>cp3late</code>, reset sweeps all three forks below the incumbent &mdash; best <b>1068 cycles, the
+    campaign record</b> &mdash; while all three continues sit at 1097&ndash;1099. <b>Bottom: best-of-arm
+    advantage per branch.</b> Large where a basin hides headroom; noisy at hot branches where continuation
+    still has easy progress (cp3mid, cp6mid); small-but-mostly-positive across the cold tail. The new branches
+    sharpen the picture: cp4late/cp7late (truly near-ceiling) give &plusmn;small effects, while{" "}
+    <code>cp8late</code> &mdash; the fleet&rsquo;s <em>worst</em> seed, whose &ldquo;0.0%&rdquo; is residual to
+    its own run, not to the fleet frontier &mdash; still hides absolute room and reset finds &minus;39.
+    Headroom-to-the-frontier, not time-in-run, is what predicts the reset payoff.</figcaption>
+  </figure>
+
+  <div class="callout">Across both tasks, resetting context changes what the agent finds from the same starting
+  artifact. The average tinyCIFAR advantage is +0.027 merit across nine branch points; at kernel
+  <code>cp3late</code>, reset improves by &minus;29 cycles and produces the campaign record. The effect is
+  heterogeneous rather than universal.</div>
+
+  <h3>3.3 Coordination at scale: communication and repeated branch selection</h3>
+  <figure>
+    <div class="imgbox"><img src="/writing/cifar-communication-iso-cost.png"
+      alt="tinyCIFAR communication at eight agents versus independent baselines, with an iso-cost panel"></div>
+    <figcaption><b>Communication @8, first 40-hour leg.</b> The left panel shows all eight
+    checkpoint trajectories on a mean-per-agent credit clock. The iso-cost panel charges
+    expected independent performance at single-run cost and both best-of-eight outcomes at
+    aggregate fleet cost. At 157,405 checkpointed communication credits, best-of-comm reaches
+    0.5176 merit versus 0.3998 for the independent average and 0.6116 for independent best-of-eight.
+    The hard Harbor timeout interrupted each final episode; those unpriced tails are excluded from
+    this snapshot, and the fleet was subsequently resumed toward its 400K aggregate cap.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="imgbox"><img src="/writing/kernel-branch-selection-trajectories.png"
+      alt="kernel reset and continuation branch-selection trajectories through two fork rounds"></div>
+    <figcaption><b>Powered branch selection through round two.</b> Reset round 1 selected{" "}
+    <code>r1b5</code> at 1,235 cycles and the resumed lineage reached 1,228 before entering an
+    active second reset fork. Continue round 1 selected <code>r1b3</code> at 1,224; round 2
+    selected <code>r2b2</code> at 1,213, which remains the selected-lineage record. The x-axis
+    follows selected-lineage credits plus each branch&rsquo;s local credits; it is intentionally
+    not the aggregate protocol-spend axis.</figcaption>
+  </figure>
+</section>
+
+<section id="s4">
+  <h2><span class="secno">4</span>{" "}Advanced interventions built on reset</h2>
+  <p>Plain reset wastes nothing but the context &mdash; but it also learns nothing from the discarded branch.
+  Three protocols, smoke-tested on the kernel task, push past that:</p>
+  <div class="protos">
+    <div class="proto">
+      <h4>Branch-select <span class="status">smoke passed</span></h4>
+      <div class="flow">main leg runs &#8595;
+stall detected (no gain for S credits)
+&#8594; fork K reset branches
+&#8594; race them on equal budget
+&#8594; best branch becomes main; rest dropped</div>
+      <p>Automates &sect;3 as a <em>policy</em>: a stall detector triggers the fork; selection keeps fleet width
+      at 1. Controls: K=0 (plain continue) and K=1 (reset without selection).</p>
+    </div>
+    <div class="proto">
+      <h4>Branch-distill <span class="status">smoke passed</span></h4>
+      <div class="flow">fork K reset branches &#8595;
+each writes a post-mortem note
+&#8594; distiller merges: winner workspace
+   + ranked all-branch report
+&#8594; ONE distill leg resumes with the merged material</div>
+      <p>Selection discards K&minus;1 branches&rsquo; discoveries; distillation folds them back in as a
+      structured note on the winner&rsquo;s workspace.</p>
+    </div>
+    <div class="proto">
+      <h4>Board (broadcast) <span class="status">smoke passed</span></h4>
+      <div class="flow">N concurrent runs &#8595;
+each episode: post score + 1-line STATUS
+to a shared board; read peers&rsquo; entries
+control: same N, no board</div>
+      <p>The lightest-touch social intervention: does merely seeing that a peer is ahead (and roughly how)
+      decorrelate basins the way a reset does?</p>
+    </div>
+  </div>
+  <div class="incoming"><span class="tag">&#9679; data incoming</span>{" "}
+  All three protocols have validated drivers and passed smoke runs on the kernel task; <b>powered branch-select
+  and board arms are active</b>, while branch-distill remains queued. Per-protocol results (vs K=0 / K=1
+  controls) will slot in here.</div>
+</section>
+
+<section id="s5">
+  <h2><span class="secno">5</span>{" "}Why resets can work: a simple model of performance curves</h2>
+  <p>Let <i>Q</i><sub>i</sub>(<i>t</i>) be seed <i>i</i>&rsquo;s best performance by budget <i>t</i>. Each
+  realized curve is a staircase: improvements arrive at irregular times, while the fleet mean can look smooth.
+  The reset argument does not begin by assuming a particular basin mechanism. It begins with the distribution of
+  those waiting times.</p>
+
+  <div class="theory-grid">
+    <div class="theory-card">
+      <span class="theory-label">Performance curve</span>
+      <div class="theory-equation"><i>Q</i>(<i>t</i>) = best quality by budget <i>t</i></div>
+      <p>Fixing a budget gives the cross-seed distribution of performance.</p>
+    </div>
+    <div class="theory-card">
+      <span class="theory-label">Qualified runtime</span>
+      <div class="theory-equation"><i>T</i><sub>q</sub> = inf{"{"}<i>t</i> : <i>Q</i>(<i>t</i>) &ge; <i>q</i>{"}"}</div>
+      <p>Fixing a quality level gives the distribution of time required to reach it.</p>
+    </div>
+    <div class="theory-card theory-card--decision">
+      <span class="theory-label">Reset decision</span>
+      <div class="theory-equation"><i>c</i> + E[<i>W</i><sub>reset</sub>] &lt; <i>m</i>(<i>s</i>)</div>
+      <p>Reset when a redraw costs less than the expected remaining wait under continuation.</p>
+    </div>
+  </div>
+
+  <h3>Performance curves and runtime distributions are two views of the same object</h3>
+  <p>For any monotone best-so-far curve and target quality <i>q</i>,</p>
+  <div class="theory-equation theory-equation--standalone">
+    P(<i>Q</i>(<i>t</i>) &ge; <i>q</i>) = P(<i>T</i><sub>q</sub> &le; <i>t</i>).
+  </div>
+  <p>The left side is a horizontal slice through the fleet at matched budget; the right side is the classical
+  runtime distribution, generalized from &ldquo;time to solve&rdquo; to &ldquo;time to quality <i>q</i>.&rdquo;
+  Inter-improvement waits are the local version of the same construction. This identity is the bridge from
+  randomized-search restart theory to anytime auto-research curves.</p>
+
+  <h3>The waiting-time distribution determines the restart decision</h3>
+  <p>Let <i>W</i> be the wait to the next improvement, and suppose the run has already stagnated for
+  <i>s</i>. Its <b>mean residual life</b> is</p>
+  <div class="theory-equation theory-equation--standalone">
+    <i>m</i>(<i>s</i>) = E[<i>W</i> &minus; <i>s</i> &mid; <i>W</i> &gt; <i>s</i>].
+  </div>
+  <p>Continuing inherits that conditional wait. A reset incurs cost <i>c</i> and draws a new wait
+  <i>W</i><sub>reset</sub>. Therefore the local decision is simply</p>
+  <div class="callout"><b>Reset condition.</b>{" "}
+    Reset when <i>c</i> + E[<i>W</i><sub>reset</sub>] &lt; <i>m</i>(<i>s</i>); otherwise continue.
+  </div>
+  <p>For the classical i.i.d. restart, <i>W</i><sub>reset</sub> has the same distribution as <i>W</i>. A
+  deterministic cutoff <i>s</i> then has expected completion time</p>
+  <div class="theory-equation theory-equation--standalone">
+    <i>R</i>(<i>s</i>) =
+    (&int;<sub>0</sub><sup><i>s</i></sup> <i>S</i>(<i>u</i>) d<i>u</i> +
+    <i>cS</i>(<i>s</i>)) / (1 &minus; <i>S</i>(<i>s</i>)),
+  </div>
+  <p>where <i>S</i>(<i>s</i>) = P(<i>W</i> &gt; <i>s</i>). This beats uninterrupted search exactly when
+  <i>m</i>(<i>s</i>) &gt; E[<i>W</i>] + <i>c</i>. Thus the full waiting-time distribution dictates whether a
+  useful cutoff exists. Decreasing hazard is a sufficient condition for rising mean residual life. Under formal
+  long-tailedness, the residual wait eventually exceeds any fixed redraw cost, so an independent cutoff restart
+  becomes advantageous. Empirically, the safer test is the residual-wait curve itself: no Pareto fit is required.</p>
+
+  <h3>A rate mixture explains why a long wait can be informative</h3>
+  <p>The restart result above needs no latent-basin story. A mixture supplies one mechanism. At a fixed quality,
+  suppose a search state <i>b</i> has an approximately memoryless improvement wait
+  <i>W</i> &mid; <i>b</i> &sim; Exp(&lambda;<sub>b</sub>). Pooling states gives</p>
+  <div class="theory-equation theory-equation--standalone">
+    <i>S</i>(<i>w</i>) = &sum;<sub>b</sub> &pi;<sub>b</sub>
+    exp(&minus;&lambda;<sub>b</sub><i>w</i>).
+  </div>
+  <p>After observing no improvement for a long time, posterior weight shifts toward smaller
+  &lambda;<sub>b</sub>. The state itself need not deteriorate; stagnation reveals that the current draw was
+  probably slow. A reset can help by redrawing that search state.</p>
+
+  <p>We test this explanation with two model organisms. The calibrated trap-mixture implements the mechanism
+  directly. The <b>stateful SLS organism</b> runs clause-weighting local search (Breakout/DLM-style) on
+  over-constrained MAX-3SAT; accumulated clause weights act as history-derived search state, distinct from the
+  current assignment and best assignment.</p>
+  <figure>
+    <div class="imgbox"><img src="/writing/fig5_organisms.png" alt="fig5_organisms.png"></div>
+    <figcaption><b>Rows: trap-mixture simulation (top), stateful-SLS organism (bottom). Columns:</b> (1) the
+    fleet mean is a log-sigmoid (R&sup2;=0.996 / 0.981) even though individual runs are step-like and
+    heterogeneous &mdash; the sigmoid is an <em>ensemble</em> artifact of averaging over basins; (2) cross-run
+    spread does not shrink; (3) the diagnostic waiting-time signature: a single state has approximately flat
+    residual wait, while <b>pooled expected-further-wait rises with stagnation</b>. The last column is the
+    empirical premise used by the reset inequality above.</figcaption>
+  </figure>
+
+  <h3>What the classical argument does &mdash; and does not &mdash; establish</h3>
+  <ul>
+    <li><b>Exact transfer:</b> classical restart theory covers independent cold restarts toward a fixed target.
+    The qualified-runtime identity above transfers that logic exactly to fresh attempts on an anytime curve.</li>
+    <li><b>Context reset is a warm restart:</b> our experiment holds the workspace fixed and redraws only the
+    conversation state. Its post-reset wait need not be i.i.d. with a cold start, which is why the general
+    condition uses E[<i>W</i><sub>reset</sub>] rather than assuming E[<i>W</i>]. Preserving the workspace is an
+    experimental control here, not a claim that every useful reset must preserve it.</li>
+    <li><b>Mechanism versus decision:</b> the waiting-time distribution licenses the decision; the rate-mixture
+    model explains one way that distribution can arise. The matched forks in &sect;3 test whether removing
+    context actually produces the required redraw from the same starting workspace.</li>
+    <li><b>Policy remains empirical:</b> Luby schedules are distribution-agnostic cold-restart schedules.
+    Stagnation-triggered context-reset policies must estimate costs and residual waits in this warm setting,
+    which is what branch-select in &sect;4 begins to operationalize.</li>
+  </ul>
+</section>
+
+<section id="refs">
+  <h2><span class="secno">&sect;</span>{" "}References &amp; reproducibility</h2>
+  <ul class="refs">
+    <li>C. Gomes, B. Selman, H. Kautz &mdash; <i>Boosting Combinatorial Search Through Randomization</i>, AAAI 1998;
+    C. Gomes, B. Selman, N. Crato, H. Kautz &mdash; <i>Heavy-Tailed Phenomena in Satisfiability and Constraint
+    Satisfaction Problems</i>, J. Automated Reasoning 24, 2000.</li>
+    <li>M. Luby, A. Sinclair, D. Zuckerman &mdash; <i>Optimal Speedup of Las Vegas Algorithms</i>, IPL 47, 1993.</li>
+    <li>H. Louren&ccedil;o, O. Martin, T. St&uuml;tzle &mdash; <i>Iterated Local Search</i>, Handbook of Metaheuristics, 2003.</li>
+  </ul>
+  <p class="muted refs-note">Data &amp; code: <code>/data/t-jackcai/frontier-runs</code> &mdash;
+  fleets (<code>tinycifar-copilot-g55x-*</code>, <code>kernel-cpbase-*</code>), fork studies
+  (<code>cvr_*</code>, <code>kernel_fork4_*</code>), fits (<code>cifar_fleet.py</code>), organisms
+  (<code>sat_stateful_organism.py</code>, <code>sat_bnb_organism.py</code>, <code>sim_object_*.py</code>).
+  All cifar accuracies are sealed-test; kernel scores from the hardened grader. Continue/reset arms are
+  credit-matched within every comparison; reset receives a strict information subset of continue. Trivial
+  identity-baseline kernel submissions are excluded. Baseline cifar curves use deduplicated billing-trace step
+  clocks; fork curves use gap-capped active-time apportionment between billing anchors; only compaction-event
+  placement uses linear interpolation. Where an interrupted final episode was not mirrored, trace totals are
+  lower bounds. The trajectory figure shows those tail outcomes with explicit lower-bound markers; all
+  quantitative baseline fits, bands, ranks, and credit totals clip at the final trace row. The original
+  baselines and all continue/reset comparisons used the
+  Copilot default context tier (conversation auto-compaction at ~218K total tokens, measured via{" "}
+  <code>preCompactionTokens</code>; cifar median 218,532, kernel median 218,697). The separately labeled
+  long-context replication is not pooled into those comparisons.</p>
+</section>
+
+  <div slot="footer">
+    Stuck-agents research program · cifar &amp; kernel campaigns, June–July 2026 ·
+    fork studies complete (44/44 cifar forks, 72/72 kernel forks); long-context replication complete.
+    · <a href="/writing/">Jack Cai writing index</a>
+  </div>
+</ReportLayout>

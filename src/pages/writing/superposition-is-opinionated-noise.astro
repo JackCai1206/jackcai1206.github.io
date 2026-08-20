@@ -1,0 +1,140 @@
+---
+import TableOfContents from "../../components/report/TableOfContents.astro";
+import ReportLayout from "../../layouts/ReportLayout.astro";
+---
+
+<ReportLayout
+  title="Superposition is opinionated noise"
+  description="Superposition distillation and input-noise distillation are one knob—perturbing the student's Stage-1 input—and only shared, vocabulary-basis perturbations help."
+  eyebrow="Knowledge distillation · working note"
+  publishedAt="2026-07-20"
+  status="Interim · v3"
+>
+  <TableOfContents slot="toc">
+    <li><a href="#summary"><span class="n">0</span>Summary</a></li>
+    <li><a href="#setup"><span class="n">1</span>Setup and noise types</a></li>
+    <li><a href="#noise"><span class="n">2</span>One-hot noise</a></li>
+    <li><a href="#superposition"><span class="n">3</span>Superposition</a></li>
+    <li><a href="#related-work"><span class="n">4</span>Related work</a></li>
+    <li><a href="#planned-work"><span class="n">5</span>Planned work</a></li>
+  </TableOfContents>
+
+<div class="col" id="summary">
+    <div class="abstract"><span class="k">Summary</span>
+      <p>Two experiments we ran separately — <strong>superposition distillation</strong> and <strong>input-noise distillation</strong> — are the identical recipe: two-stage pure-KD where <strong>Stage&nbsp;1 distills the teacher on a corrupted input</strong> and <strong>Stage&nbsp;2 recovers on clean data</strong>. They differ only in <em>how the input is corrupted</em>.</p>
+      <p>On one shared baseline (none-KD = 3.172): perturbations built from the <strong>shared token-embedding basis</strong> help — real-token superposition (token_merge, <span class="neg">−0.029</span>), mixed sequences (cross_seq, <span class="neg">−0.022</span>), or even <em>random</em> tokens (one-hot noise, <span class="neg">−0.016</span>) — while a perturbation drawn independently in each model's <em>private hidden space</em> (embed) does nothing. <strong>Magnitude matters; internal structure barely does; only the private one is dead.</strong> The operative property is consistency — teacher and student must see the same corrupted input, which for models of different width means the perturbation must live in the shared vocabulary basis.</p>
+    </div>
+  </div>
+
+  <!-- ============ 1 ============ -->
+  <div class="col" id="setup">
+    <h2><span class="lab">1 · Setup</span>The method, the config, and the noise types</h2>
+    <p>A random-init SmolLM2-architecture <strong>student (135M)</strong> is distilled from a trained <strong>SmolLM2-1.7B teacher</strong> on FineWeb-Edu with <strong>pure forward-KL</strong> (temperature 1, no cross-entropy term). Training is two-stage and iso-FLOP: Stage&nbsp;1 distills on a <em>perturbed</em> input, Stage&nbsp;2 on the clean input.</p>
+    <div class="diagram">
+      <div class="flow">
+        <div class="stage"><div class="t">Stage 1 · perturb</div><div class="d">distill the teacher on a <b>corrupted</b> input<br><code>o → o + σ·u</code> &nbsp;(or a token superposition)</div></div>
+        <div class="arrow">→</div>
+        <div class="stage clean"><div class="t">Stage 2 · recover</div><div class="d">distill on the <b>clean</b> input <code>o</code><br>to recover</div></div>
+        <div class="arrow">→</div>
+        <div class="stage"><div class="t">objective</div><div class="d">match teacher's full next-token distribution<br><b>forward-KL, τ = 1, no CE</b></div></div>
+      </div>
+      <div class="merge">The <b>only</b> thing that changes between the two studies is what fills Stage&nbsp;1.</div>
+    </div>
+
+    <h3>Model organism — the training testbed</h3>
+    <p>The workhorse is a real but small distillation system, chosen so we can sweep it cheaply while the KD dynamics stay representative. A random-init 135M student is distilled from a same-family 1.7B teacher; the two <strong>share a vocabulary</strong> — the property the whole shared-perturbation story depends on. It is deliberately not a frontier run: the point is a controlled organism where a single knob (the Stage-1 perturbation) can be isolated at iso-FLOP.</p>
+    <div class="tbl-wrap"><table>
+      <tbody>
+        <tr><td class="k">Student / teacher</td><td>random-init SmolLM2-135M arch (h576, 30 layers, 9 heads / 3 KV, inter 1536) ← frozen SmolLM2-1.7B</td></tr>
+        <tr><td class="k">Objective</td><td>pure forward-KL on the teacher's soft distribution · temperature <b>1</b> · no CE term</td></tr>
+        <tr><td class="k">Optimizer</td><td>AdamW (β 0.9 / 0.95, weight-decay 0.1, fused)</td></tr>
+        <tr><td class="k">LR / schedule</td><td>6e-4 · WSD (warmup-stable-decay, 10% warmup)</td></tr>
+        <tr><td class="k">Sequence length</td><td>1024</td></tr>
+        <tr><td class="k">Effective batch</td><td>512 sequences ≈ <b>0.52M tokens/step</b> (8 GPUs × micro-batch 64 × grad-accum 1, DDP)</td></tr>
+        <tr><td class="k">Steps / tokens</td><td>8000 ≈ <b>4.2B tokens</b> (≈ 1.5× Chinchilla for 135M)</td></tr>
+        <tr><td class="k">Comparison</td><td>iso-FLOP — every arm matched on total (student + teacher) FLOPs, so the <b>perturbation is the only variable</b></td></tr>
+      </tbody>
+    </table></div>
+    <p><span class="key">Why this is the canonical config, not a tuned one.</span> The objective is the standard pretraining-distillation recipe — <strong>forward-KL on the teacher's soft targets at τ=1 with no CE</strong> is exactly what Gemma-2 and the Minitron/Llama-3.2 line use; the <strong>WSD schedule</strong> is the modern pretraining default (MiniCPM, DeepSeek); and the batch (~0.5M tok/step), LR (6e-4), and sequence length are standard for a ~135M model trained near Chinchilla. So the perturbation is measured against a legitimate, un-tuned baseline rather than a strawman.</p>
+
+    <h3>Toy mixture model — a frozen-teacher probe</h3>
+    <p>Alongside the training testbed we use a much smaller, <strong>no-training probe</strong> to see what a perturbed input actually <em>does</em>. We hand-build superpositions — a few sentence pairs mixed <code>[λ, 1−λ]</code> — feed them to the <strong>frozen teacher</strong>, and measure how its next-token distribution tracks the clean prediction as the mixture deepens (λ: 1.0 → 0.5). No student, no training: just the teacher's response to a controlled mixture. This tells us the <em>shape</em> of the target the KD has to match — and where in λ the perturbation is informative yet still recoverable, rather than out-of-distribution garbage.</p>
+    <figure><img alt="teacher recovery vs lambda" src="/writing/superposition-teacher-recovery-vs-lambda.png" loading="lazy" decoding="async"><figcaption><b>The teacher recovers the mixture.</b> Top-1 agreement with the clean prediction as the mix deepens, for two hand-crafted sentence pairs. At the KD operating point (λ≈0.7–0.8) the teacher still recovers most of the dominant token; only near an equal blend (λ→0.5) does it collapse. This is <em>why</em> superposition is an "opinionated," recoverable perturbation — and it foreshadows the λ the training runs prefer.</figcaption></figure>
+
+    <h3>The noise types — one axis</h3>
+    <p>Every Stage-1 input is a modification of the one-hot <code>o</code>. Characterizing each by what it is built from and whether it is applied consistently to both models makes the whole pattern fall out:</p>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Stage-1 perturbation</th><th>Built from</th><th>Shared T↔S?</th><th>Effect (Δ vs baseline)</th></tr></thead>
+      <tbody>
+        <tr><td><strong>token_merge</strong> — merge <em>k</em> adjacent real tokens</td><td>real vocab rows</td><td>yes</td><td><span class="pill good">−0.029</span></td></tr>
+        <tr><td><strong>cross_seq</strong> — mix two real sequences</td><td>real vocab rows</td><td>yes</td><td><span class="pill good">−0.022</span></td></tr>
+        <tr><td><strong>one-hot noise</strong> — add <em>random</em> tokens</td><td>random vocab rows</td><td>yes</td><td><span class="pill good">−0.016</span></td></tr>
+        <tr><td><strong>embed noise</strong> — Gaussian in hidden space</td><td>raw ℝ<sup>d</sup>, per-model</td><td><strong>no</strong></td><td><span class="pill bad">no effect</span></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <!-- ============ 2 ============ -->
+  <div class="col" id="noise">
+    <h2><span class="lab">2 · Results · noise</span>One-hot noise, and why embed fails</h2>
+    <p>Perturbing the Stage-1 one-hot by <code>o → o + σ·u</code> (σ = L2 noise/signal, <code>u</code> a random combination of vocab rows fed shared to both models) gives a small but <strong>robust</strong> gain. Four facts pin the mechanism down.</p>
+    <div class="figrow">
+      <figure><img alt="sigma response" src="/writing/superposition-sigma-response.png" loading="lazy" decoding="async"><figcaption><b>Broad optimum.</b> The gain rises with σ to a plateau over σ≈0.4–0.8.</figcaption></figure>
+      <figure><img alt="S1 length sweep" src="/writing/superposition-s1-length-sweep.png" loading="lazy" decoding="async"><figcaption><b>Needs a clean tail.</b> Best when Stage-1 ≤ half the run; too long turns it <em>negative</em>.</figcaption></figure>
+    </div>
+    <div class="figrow">
+      <figure><img alt="training tails" src="/writing/superposition-training-tails.png" loading="lazy" decoding="async"><figcaption><b>Recovery.</b> In Stage 2 the noise arms settle below the clean baseline.</figcaption></figure>
+      <figure><img alt="multi-seed and embed" src="/writing/superposition-multi-seed-and-embed.png" loading="lazy" decoding="async"><figcaption><b>Real, and private-noise is dead.</b> The gain is ≈4× the seed spread; <em>embed</em> noise (independent per model) sits exactly on baseline.</figcaption></figure>
+    </div>
+    <p>Also: sweeping the noise's internal structure <code>K∈&#123;1…32&#125;</code> (spiky ↔ smooth) moves the loss by 0.002 — within noise. <strong>Only the magnitude matters, not the shape.</strong> The single dead variant is <code>embed</code>: it draws an independent Gaussian in <em>each model's</em> hidden space, so teacher and student see different corruptions and there is nothing to match.</p>
+  </div>
+
+  <!-- ============ 3 ============ -->
+  <div class="col" id="superposition">
+    <h2><span class="lab">3 · Results · superposition</span>Superposition as an opinionated perturbation</h2>
+    <p>The superposition study replaces the Stage-1 input with a <em>weighted combination of real tokens</em> — a more <em>opinionated</em> perturbation than random noise. The variants:</p>
+    <ul>
+      <li><span class="key">token_merge</span> — merge <em>k</em> adjacent tokens of one sequence into a single superposed input (weight λ on the primary token).</li>
+      <li><span class="key">cross_seq</span> — mix two different sequences position-wise, <code>[λ, 1−λ]</code>.</li>
+      <li><span class="key">cross_merge</span> — do both: cross two sequences <em>and</em> merge k tokens (a product superposition).</li>
+      <li><span class="key">TST</span> — a uniform bag of <em>s</em> tokens (weights 1/s); the reference "true optimum."</li>
+    </ul>
+    <p>Why "opinionated"? As the <a href="#setup">toy mixture model</a> (§1) showed, a frozen teacher does not treat a superposition as garbage — at the KD operating point (λ≈0.7–0.8) it still recovers the dominant token, so the superposed input yields an informative, recoverable target. Random noise probes the teacher in arbitrary directions; superposition probes it in <em>data-relevant</em> ones.</p>
+    <div class="figrow">
+      <figure><img alt="lambda sweep" src="/writing/superposition-lambda-sweep.png" loading="lazy" decoding="async"><figcaption><b>It helps.</b> Δ vs baseline across λ; token_merge bottoms out at 3.144 (Δ−0.029), below cross_seq and cross_merge.</figcaption></figure>
+      <figure><img alt="superposition training tails" src="/writing/superposition-superposition-training-tails.png" loading="lazy" decoding="async"><figcaption><b>Same shape as noise.</b> The superposition arms recover below baseline in Stage 2, just like the noise arms.</figcaption></figure>
+    </div>
+    <figure><img alt="unified delta axis" src="/writing/superposition-unified-delta-axis.png" loading="lazy" decoding="async"><figcaption><b>One ruler — the thesis.</b> All perturbation types against the shared clean-KD baseline. Structured real-token superposition &gt; random-token noise &gt; none; the only failure is the private, unshared perturbation. Structure buys a little; being shared and vocab-based is what's load-bearing.</figcaption></figure>
+  </div>
+
+  <!-- ============ 4 ============ -->
+  <div class="col" id="related-work">
+    <h2><span class="lab">4 · Related work</span>Teacher noise as Jacobian matching</h2>
+    <p>Distilling under input perturbation is not new in principle: <strong>Srinivas &amp; Fleuret (ICML 2018), <em>Knowledge Transfer with Jacobian Matching</em></strong>, prove that matching a teacher's soft output under small input noise is equivalent, to first order, to matching the teacher's input–output <strong>Jacobian</strong> (its local sensitivity). Perturb-and-match is Jacobian matching; the perturbation just chooses <em>which directions</em> of the Jacobian the student is forced to align.</p>
+    <p>That reframes our whole axis. A Jacobian match along a direction is only well-defined if <strong>teacher and student are perturbed along the same direction</strong>. This is precisely why sharing is the load-bearing property:</p>
+    <div class="diagram">
+      <div class="contrast">
+        <div class="side works"><div class="h">Shared vocab-basis  ✓</div><div class="m">δ_teacher = δ_student = σ·u</div><div class="n">one-hot noise & superposition specify the perturbation in the shared vocabulary basis — both models are pushed the same way, so the teacher's Jacobian in that direction is a matchable target.</div></div>
+        <div class="side dead"><div class="h">Private hidden space  ✗</div><div class="m">δ_teacher ⟂ δ_student</div><div class="n">embed noise draws an independent Gaussian in each model's own hidden space — there is no shared direction, so no Jacobian to match. The student chases the teacher's response to a different input.</div></div>
+      </div>
+      <div class="cap">And for two models of <em>different width</em>, the token-embedding basis is the only natural shared interface — a raw hidden vector doesn't even transfer. So "must live in the embedding basis" ≈ "must be shared." Random-token noise probes the Jacobian in arbitrary directions; superposition probes it in <em>data-relevant</em> ones — hence "opinionated," and a little better.</div>
+    </div>
+  </div>
+
+  <!-- ============ 5 ============ -->
+  <div class="col" id="planned-work">
+    <h2><span class="lab">5 · Planned work</span>Two directions</h2>
+    <p><span class="key">1 · Scale-up.</span> A scale-up to <strong>Qwen2.5-1.5B ← Qwen2.5-7B</strong> is staged, grounded in the canonical recipe (forward-KL, τ=1, same-family teacher ~5× larger, AdamW LR 2e-4). Qwen-tokenized FineWeb is prepared and the run is ready; it tests whether the shared-vocab-perturbation gain holds beyond the toy scale.</p>
+    <p><span class="key">2 · Post-training (cold-start) distillation.</span> Everything above is pretraining; does a shared input perturbation also help distilling into an <em>already-competent</em> student? The literature is a guardrail: input-perturbed <em>soft-target</em> KD in <em>generative</em> post-training is genuine white space — it exists only for classifiers (MixKD, MATE-KD) and, as of 2025, LLM classification (COD) — because the field's post-training effort went to the <em>output</em> side (on-policy / reverse-KL: MiniLLM, GKD, DistiLLM), which is incompatible with a fixed, perturbable input. The one slot where our forward-KL, fixed-input recipe stays defensible is the <strong>off-policy logit-KD cold-start</strong> (where Minitron- / DeepSeek-R1-style distillation sits). Concrete test: the <code>cross_seq</code> arm of a Qwen2.5-1.5B ← 7B reasoning cold-start, graded by MATH accuracy. <em>(We do not expect the naive "soft &lt; hard labels" result — recent matched LLM comparisons show soft ≈ or &gt; hard; the live axis is on/off-policy, not label type.)</em></p>
+
+    <h3>Caveats</h3>
+    <ul>
+      <li><span class="key">One confound.</span> <code>embed</code> differs from one-hot noise in two ways at once — hidden-basis vs. vocab-basis <em>and</em> independent vs. shared draw. A <em>shared</em> hidden-space perturbation would separate them; not yet run.</li>
+      <li><span class="key">Single scale.</span> Everything here is 135M ← 1.7B — hence the scale-up.</li>
+    </ul>
+    <div class="foot">
+      Figures from the fw4bnoise (noise) and fw4bwsd / fw4bddp / fw4bcm (superposition) sweeps; recovery panel from a frozen SmolLM2-1.7B forward pass. Val loss = clean-input validation cross-entropy (nats); lower is better. Δ measured against the shared none-KD baseline 3.172.
+      <br><a href="/writing/">← Jack Cai writing index</a>
+    </div>
+  </div>
+</ReportLayout>

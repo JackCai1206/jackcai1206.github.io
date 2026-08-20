@@ -1,0 +1,14 @@
+---
+interface Props {
+  title?: string;
+}
+
+const { title = "Contents" } = Astro.props;
+---
+
+<nav class="report-toc" aria-label={title}>
+  <p class="report-toc__title">{title}</p>
+  <ol>
+    <slot />
+  </ol>
+</nav>

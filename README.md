@@ -13,8 +13,13 @@ The development server runs at `http://localhost:4321`.
 
 ## Writing
 
-Posts are self-contained HTML files in `public/writing/`. Add each report's
-listing metadata to `src/data/writing.ts`.
+Reports are Astro pages in `src/pages/writing/`. New reports should use
+`ReportLayout.astro` and the shared components in `src/components/report/`,
+then add their listing metadata to `src/data/writing.ts`.
+
+Browser-native slide decks live in `src/pages/presentations/`. The research-agent
+reset talk supports arrow-key navigation, speaker notes with `N`, fullscreen with
+`F`, and print-to-PDF.
 
 ## Production
 

@@ -1,0 +1,272 @@
+---
+import TableOfContents from "../../components/report/TableOfContents.astro";
+import ReportLayout from "../../layouts/ReportLayout.astro";
+---
+
+<ReportLayout
+  title="Where Between-Run Variance Comes From (and How Resets Cash It In)"
+  description="Identical agent runs land far apart. We argue the spread is manufactured inside each run by context autocorrelation, and that context resets — which delete the correlation while keeping the artifact — are the cheapest way to buy it back."
+  eyebrow="Empirical study · long-horizon agentic optimization"
+  publishedAt="2026-07-24"
+  status="Living report"
+>
+  <div slot="meta" class="keyline">
+    <span><span class="sw sw--reset"></span><b>blue</b> = fresh context (reset / no carry)</span>
+    <span><span class="sw sw--continue"></span><b>orange</b> = carried context (continue)</span>
+    <span>carry-amount arms interpolate blue&nbsp;&rarr;&nbsp;orange</span>
+    <span>x&#8209;axis everywhere: <b>credits</b> (billed compute)</span>
+    <span class="report-meta-note">&#9679; living report &mdash; sections marked &ldquo;data incoming&rdquo; update as runs complete</span>
+  </div>
+
+  <TableOfContents slot="toc">
+    <li><a href="#s1"><span class="n">1</span>{" "}Variance exists</a></li>
+    <li><a href="#s2"><span class="n">2</span>{" "}Theory: autocorrelation &rarr; spread</a></li>
+    <li><a href="#s3"><span class="n">3</span>{" "}Resets decorrelate&hellip;</a></li>
+    <li><a href="#s4"><span class="n">4</span>{" "}&hellip;and do better</a></li>
+    <li><a href="#s5"><span class="n">5</span>{" "}Contrast: induced correlation</a></li>
+    <li><a href="#refs"><span class="n">&sect;</span>{" "}References &amp; repro</a></li>
+  </TableOfContents>
+
+  <section id="s1">
+    <h2><span class="n">1</span> Variance exists</h2>
+    <p>
+      Fleets of identically configured agent runs do not converge to the same outcome. At matched
+      spend, independent seeds land in a wide, non-shrinking band: kernel best-of-8 spans
+      <b>1097&ndash;1405 cycles</b> across eight seeds run to full budget (1.28&times;, CV 0.087 &mdash;
+      five further seeds were abandoned early and are excluded, which is why the raw
+      thirteen-seed range of 1097&ndash;1822 overstates it); tinyCIFAR seeds average merit 0.40
+      while one seed reaches 0.61; INT4 native baselines span <b>178&ndash;477</b> at a matched
+      9,370-credit horizon (median 357, n&nbsp;=&nbsp;8); and within-cell replicates of the
+      reset grid differ by up to 2&times;. Rank does not persist along the way
+      (early leader &ne; final winner), so the spread cannot be escaped by picking winners early.
+    </p>
+    <p class="report-meta-note">&#9679; data incoming: unified spread figure at matched credit across all four substrates (task&nbsp;#1).</p>
+  </section>
+
+  <section id="s2">
+    <h2><span class="n">2</span> Theory: within-run autocorrelation manufactures across-run spread</h2>
+    <p>
+      Treat a run as a sequence of attempts that are <em>correlated through the context window</em>:
+      each attempt conditions on the transcript of every prior one. If the integrated correlation
+      time is &tau;, a budget of T attempts contains only N<sub>eff</sub> &asymp; T/&tau; effective
+      draws. A run&rsquo;s headline number is a max over its effective draws &mdash; so large &tau; means few
+      draws, and few draws mean the max is itself high-variance: the between-run spread of
+      &sect;1 is manufactured inside each run. Interventions that shrink &tau; raise
+      N<sub>eff</sub>, which simultaneously raises the expected best and tightens its distribution.
+      The trap-mixture model is the &tau;&nbsp;&rarr;&nbsp;&infin; limit (a basin an agent never
+      leaves), and predicts continue-forks inherit the basin while reset-forks redraw it.
+    </p>
+    <p class="report-meta-note">&#9679; data incoming: formal note + &tau; estimates per treatment arm (task&nbsp;#2).</p>
+  </section>
+
+  <section id="s3">
+    <h2><span class="n">3</span> Resets decorrelate trajectories</h2>
+    <p>
+      The cleanest causal cell holds the artifact constant: fork eight branches from one
+      checkpoint and vary only the conversation. Continue-branches (inherited context) are
+      near-clones &mdash; median within-round score SD <b>1.2 cycles</b>, and in <em>two</em> of
+      seven rounds all eight branches returned bit-identical results &mdash; while reset-branches
+      spread <b>3.0&times;</b> wider (median SD 3.6; ranges up to 98), and each reset round&rsquo;s
+      minimum is where the wins come from. Watching N<sub>eff</sub> fall to 1 while K&nbsp;=&nbsp;8
+      is &sect;2&rsquo;s claim made visible: eight independent 5,000-credit branches, one answer.
+      The reset advantage also decays with artifact maturity (SD 35.6 &rarr; 5.0 &rarr; 10.7 &rarr; 2.1
+      &rarr; 1.4 &rarr; 0.5 across six resolved rounds), so decorrelation has a shelf life &mdash;
+      consistent with hot fork regions living early.
+    </p>
+    <figure>
+      <div class="imgbox"><img src="/writing/fig_v_kernel_branch_select.png" alt="fig_v_kernel_branch_select.png"></div>
+      <figcaption><b>Kernel branch-select, reset vs continue.</b> <b>Left:</b> best-so-far against
+      main-trajectory credits &mdash; every leg&rsquo;s true billed cost plus only the <em>winning</em>
+      branch of each round, since the seven losing branches are spend but are not on the trajectory.
+      Both lineages start at 1431, so they are comparable at every budget.
+      At a matched 77,199&nbsp;cr, continue&nbsp;=&nbsp;1203 vs reset&nbsp;=&nbsp;<b>1155</b> &mdash; and
+      reset&rsquo;s value there already beats continue&rsquo;s last selected value, 1197 at 98,174&nbsp;cr,
+      a level continue never reached at any budget. <b>Right:</b> the K&nbsp;=&nbsp;8 branch outcomes per
+      resolved round that produce it. Cycles, lower is better. Reset round&nbsp;7 is currently active
+      and therefore appears only in the all-branches figure below.
+      <br /><br />
+      <b>&ldquo;Reset just gets more tries&rdquo; &mdash; it does, and that is not the explanation.</b>
+      Carrying context costs tokens, so a continue-branch pays 470&nbsp;credits per scored
+      submission against a reset-branch&rsquo;s 199 (2.37&times;); legs, which run in continue-mode in
+      <em>both</em> arms, cost the same either way (131 vs 128) and serve as the built-in control.
+      Re-matching the two lineages on <em>attempts</em> rather than credits therefore removes
+      reset&rsquo;s cheaper draws &mdash; and the gap <em>widens</em> from 47 to <b>169 cycles</b>
+      (at 356 submissions: reset 1165, continue 1334). Continue needs 553 submissions to reach
+      1197, still worse than reset at 356. The advantage survives both normalisations.</figcaption>
+    </figure>
+    <figure>
+      <div class="imgbox"><img src="/writing/fig_v_decorrelation.png" alt="fig_v_decorrelation.png"></div>
+      <figcaption><b>Do resets decorrelate the trajectory?</b> All 12 grid cells at n&nbsp;=&nbsp;4.
+      <b>B (operative panel):</b> mean code similarity of submitted solutions in lag-matched blocks
+      <em>within</em> a context segment (&#9679;) vs <em>across</em> a reset boundary (&#9660;), by arm.
+      Every arm shows a drop &mdash; resets create real artifact-trajectory discontinuities &mdash; but
+      the only <em>robust</em> ordering is at the top of the carry axis: full natural summaries
+      (&sim;1.5k&nbsp;tok) shrink the break to 0.0097&nbsp;&plusmn;&nbsp;0.0021 against
+      0.027&ndash;0.033 for every smaller carry, i.e. the summary re-anchors the agent to its own
+      code. The three partial-carry arms (0, 128, 512&nbsp;tok) are mutually indistinguishable
+      &mdash; an earlier reading on partial data had hard resets breaking hardest, and the completed
+      grid does not support it. Reset <em>frequency</em> orders as expected (rare&nbsp;i4 0.040
+      &gt; i2 0.027 &gt; frequent&nbsp;i1 0.022, l2048 excluded) but at only &sim;1.6&nbsp;SE, with two
+      arm means carried by single heavy-tailed runs. <b>A:</b> integrated
+      autocorrelation time of the residualized score stream &mdash; native runs are the most correlated
+      (5.9 vs 1.9&ndash;3.9), but this instrument removes slow drift (the very component anchoring lives in) and will be
+      replaced by a level-process estimator; treat panel&nbsp;A as provisional.</figcaption>
+    </figure>
+    <p>
+      <b>Spread is half the mechanism.</b> Decomposing every branch round into the
+      <em>location</em> of the branch distribution (median&nbsp;&minus;&nbsp;parent) and its
+      <em>spread</em> (SD) separates two things that &sect;3 had conflated. Location is what
+      distinguishes the arms: reset shifts the whole distribution above the parent
+      (kernel median&nbsp;+5.00 vs continue exactly&nbsp;0.00; bbopl +0.01 vs &minus;0.03).
+      Spread is what converts that shift into yield, because keep-best takes a max &mdash;
+      kernel&rsquo;s continue round&nbsp;1 had a location of only +1 but a spread of 10.0, and
+      banked +27. Neither alone suffices, which is what the apparent counterexamples were:
+      on bbopl the two arms have <em>identical</em> spread (1.0&times;) and only location
+      separates them, while on vector-db-ann <em>neither</em> arm reaches positive location
+      (&minus;0.94 and &minus;1.40) and, accordingly, neither round yields anything. A wide
+      spread around a parent you cannot beat is just noise.
+    </p>
+    <p class="report-meta-note">&#9679; data incoming: &tau; instrument v2 (level-process/variogram); pseudo-reset control
+    on native runs; per-arm &tau; vs across-run outcome variance (task&nbsp;#3a).</p>
+  </section>
+
+  <section id="s4">
+    <h2><span class="n">4</span> &hellip;and do better</h2>
+    <p>
+      The INT4 reset grid (reset every 1/2/4 context-slots &times; carried summary
+      {0, 128, 512, 2048} tokens &times; 4 replicates, against native-compaction baselines)
+      turns the knob continuously. <b>Complete grid, 46 runs, read at a matched 9,370-credit
+      horizon:</b> every one of the twelve cells beats the native-compaction baseline
+      (median 356.6), pooling to <b>457.5, i.e. +100.9 points or +28%</b>. The effect is
+      monotone in <em>carried summary</em> &mdash; no-carry <b>+135.3</b>, 128&nbsp;tok +118.6,
+      512&nbsp;tok +87.5, full summary +47.4 &mdash; so the more context a reset preserves, the
+      more of its benefit it gives back. The strongest cell is reset-every-slot with no carry, at
+      610.9 (+71%). It is <em>not</em> monotone in reset frequency: at zero carry more frequent is
+      better (610.9 / 472.1 / 422.7 for i1/i2/i4), but at 128&nbsp;tokens that ordering inverts.
+      And beating the native <em>median</em> is not beating its envelope &mdash; native spans
+      180&ndash;477, and only the i1-l0 cell clears its maximum. Empirical carry is
+      0 / &sim;120 / &sim;463 / &sim;1469 tokens (the 2048 cap never binds &mdash; that arm is
+      &ldquo;full natural summary&rdquo;).
+      The mechanism shows in where the budget goes: native runs spend a median <b>90%</b> of
+      their credits after their last improvement (six of eight plateau before ~1,600 of 12,000),
+      against <b>25%</b> for the reset grid. Resets do not only raise the score; they convert
+      otherwise-dead budget back into search.
+      In branch-select, the reset lineage reached 1155 cycles by 77,199 main-trajectory credits;
+      continuation was still at 1203 there and later reached 1197 at 98,174 credits.
+    </p>
+    <figure>
+      <div class="imgbox"><img src="/writing/reset_grid_trajectories.png" alt="reset_grid_trajectories.png"></div>
+      <figcaption><b>The INT4 reset grid, all twelve cells.</b> Best-so-far against credits;
+      thin vertical lines are resets, the grey band is the native-compaction envelope over
+      eight baseline runs, the dotted vertical is the matched-horizon read. Rows are carried
+      summary (0 / 128 / 512 / 2048 tokens, hardest reset at top), columns are reset interval
+      (1 / 2 / 4 slots). Read the <em>shapes</em>: native runs flatten early and stay flat,
+      while reset cells keep stepping late &mdash; the same budget, still buying improvements.</figcaption>
+    </figure>
+    <figure>
+      <div class="imgbox"><img src="/writing/fig_reset_grid_marginals.png" alt="fig_reset_grid_marginals.png"></div>
+      <figcaption><b>Which knob actually carries the signal.</b> <b>A:</b> reset STRENGTH is
+      monotone &mdash; carrying less summary across a reset scores higher
+      (&rho;&nbsp;=&nbsp;&minus;0.39, p&nbsp;=&nbsp;0.004). <b>B:</b> reset INTERVAL is not
+      (&rho;&nbsp;=&nbsp;&minus;0.15, p&nbsp;=&nbsp;0.16); 1, 2 and 4 slots are mutually
+      indistinguishable at n&nbsp;=&nbsp;46. <b>C:</b> the sobering panel &mdash; between-cell SD
+      (62) is <em>smaller</em> than within-cell SD at fixed config (83), a noise-to-signal ratio
+      of 0.55. Any single grid cell is close to a coin flip; only the marginal over strength
+      survives. This panel should govern how much weight the rest of the grid carries.</figcaption>
+    </figure>
+    <figure>
+      <div class="imgbox"><img src="/writing/kernel_branch_selection_trajectories.png" alt="kernel_branch_selection_trajectories.png"></div>
+      <figcaption><b>Kernel branch selection, every branch drawn.</b> Reset (left) vs continue
+      (right), K&nbsp;=&nbsp;8 per round, cycles so lower is better. The reset lineage reaches
+      <b>1155</b> after six selected rounds and is running round&nbsp;7; continuation selected
+      seven rounds and remains at <b>1197</b>. Its controller then disappeared during leg&nbsp;39,
+      after the Harbor trial completed but before its done marker was written, so that arm is
+      inactive rather than cleanly complete. The per-round tables show the mechanism: continue
+      rounds return eight nearly identical numbers (rounds&nbsp;3 and 7 are bit-identical), while
+      reset rounds spread early and converge near the apparent ceiling.</figcaption>
+    </figure>
+    <figure>
+      <div class="imgbox"><img src="/writing/fig_bsel_int4.png" alt="fig_bsel_int4.png"></div>
+      <figcaption><b>INT4 branch selection &mdash; and what a max hides.</b> Thick line is the
+      selected lineage on a <em>median-of-5 re-grade</em>; the faint line is the running max of
+      raw submissions, kept only to show how far apart they are. Each branch draws its raw-max
+      curve, then a dotted drop to its re-graded median (diamond); the winner&rsquo;s median is
+      where the trajectory steps. Round&nbsp;3 is the lesson: branch b3 logged 602.8 against
+      b8&rsquo;s 470.5, but re-graded, b8 wins 453.0 to 450.9. Reset climbs
+      327&nbsp;&rarr;&nbsp;415&nbsp;&rarr;&nbsp;437&nbsp;&rarr;&nbsp;453; continue goes
+      327&nbsp;&rarr;&nbsp;335 and stops, keeping its own head at round&nbsp;5 because no branch
+      beat it. The baseline lines are re-graded medians too, so trajectory and reference are
+      commensurate.</figcaption>
+    </figure>
+    <figure>
+      <div class="imgbox"><img src="/writing/fig_bsel_cifar.png" alt="fig_bsel_cifar.png"></div>
+      <figcaption><b>tinyCIFAR branch selection, retired K=4 snapshot.</b> Axis is merit &mdash; the accuracy gate times
+      a log-size term &mdash; because accuracy alone is flat here: essentially every passing solver
+      sits at the ~94% bar, so the runs race on size. At about 66.3K credits per arm, reset&rsquo;s
+      incumbent was <b>0.496</b>, with a branch at <b>0.500</b>; continuation reached <b>0.480</b>.
+      This campaign was stopped on July&nbsp;29 and restarted cleanly with K=8, capped at four
+      concurrent branches per arm and balanced across two Copilot credentials. The figure will
+      switch to the K=8 campaign once its first fork round lands.</figcaption>
+    </figure>
+    <p class="report-meta-note">&#9679; Caveat on this section&rsquo;s numbers: the grid figures
+    above are computed from <em>logged maxima</em> on both sides &mdash; grid cells and native
+    baselines alike &mdash; so the comparison is internally consistent, but the levels are not.
+    Native INT4 runs inflate <b>1.42&ndash;1.58&times;</b> between logged max and re-graded median
+    (&sect;5), which puts the true native median near <b>241</b>, not 356.6. The branch-select
+    figures are already on re-graded medians; the grid is not, and is queued for it.</p>
+    <p class="report-meta-note">&#9679; data incoming: capped branch-select lineages, matched-credit
+    final figures (task&nbsp;#4 / #3b).</p>
+  </section>
+
+  <section id="s5">
+    <h2><span class="n">5</span> Contrast: correlation across agents, induced on purpose</h2>
+    <p>
+      Communication is the same axis run backwards: a shared board <em>induces</em> correlation
+      between agents. On kernel it lifted the whole fleet past the independent best-of-8
+      (1070 vs 1097) &mdash; idea-transfer decorrelates each agent from its own rut faster than it
+      homogenizes the fleet. On tinyCIFAR it raised the floor but never the ceiling and
+      plateaued. Within-agent correlation wastes draws; across-agent correlation can pay &mdash;
+      the resource being managed in both cases is the diversity of effective attempts.
+    </p>
+    <p>
+      On INT4 it did neither: <b>communication@4 lost to independent runs</b>, median 129 against
+      241, with the best comm agent (162) below six of eight independent runs. Four agents is a
+      thin fleet and this is one campaign, so read it as a boundary rather than a reversal &mdash;
+      but it is the first substrate where a shared board did not at least raise the floor.
+    </p>
+    <figure>
+      <div class="imgbox"><img src="/writing/fig_comm4_int4_trajectories.png" alt="fig_comm4_int4_trajectories.png"></div>
+      <figcaption><b>INT4 communication@4 trajectories.</b> <b>Left:</b> per-agent best-so-far on
+      a mean-per-agent credit clock. All four comm agents plateau near 150&ndash;180 by ~2,500
+      credits and do not move again for the remaining ~9,500, while the independent runs keep
+      climbing to 330&ndash;477. They are not merely worse &mdash; they are stuck <em>together</em>,
+      which is what a shared board does when it homogenises instead of cross-pollinating.
+      <b>Right:</b> iso-cost, K matched at 4 on both sides. The independent average keeps
+      single-run cost; both best-of-4 curves pay the aggregate 4-run cost, since a max over four
+      runs requires paying for four. Independent best-of-4 dominates comm@4 at every budget.
+      Hollow markers are the re-graded medians (310 vs 162) &mdash; the gap between each line&rsquo;s
+      end and its marker is the max-inflation, which is why the ranking is stated on medians.</figcaption>
+    </figure>
+    <figure>
+      <div class="imgbox"><img src="/writing/fig_comm4_int4.png" alt="fig_comm4_int4.png"></div>
+      <figcaption><b>INT4 communication@4 vs independent runs, on re-graded medians.</b> Every
+      run scored identically: take its best submission, re-grade that artifact 5&times;, drop
+      MAD&gt;3 outliers, report the median. <b>Left:</b> logged max (ghost) against what
+      reproduces (solid), with the inflation factor above each bar. <b>Right:</b> the two
+      populations. This is also the cleanest measurement of max-inflation we have: the eight
+      independent runs inflate <b>1.42&ndash;1.58&times;</b> with almost no variation, which is
+      what licenses the caveat in &sect;4 and the re-graded baselines in the INT4 branch-select
+      figure. Two comm agents inflate only 1.09&ndash;1.13&times; &mdash; they submitted far less,
+      and a max over fewer draws is a less biased max.</figcaption>
+    </figure>
+  </section>
+
+  <section id="refs">
+    <h2><span class="n">&sect;</span> References &amp; repro</h2>
+    <p>
+      Data and figure scripts live in <code>frontier-runs</code> (<code>report_style.py</code> is
+      the shared figure style; every figure regenerates from raw run archives). Predecessor
+      report: <a href="/writing/stuck-agents-report/">Stuck Agents</a>.
+    </p>
+  </section>
+</ReportLayout>
