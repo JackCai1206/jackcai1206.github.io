@@ -1,0 +1,39 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import WritingRow from "../../components/WritingRow.astro";
+import { writing } from "../../data/writing";
+---
+
+<BaseLayout
+  title="Writing — Jack Cai"
+  description="Research notes on generalization, self-improving models, and automated research."
+>
+  <section class="page-intro">
+    <h1>Writing</h1>
+    <p>
+      Research notes on how models generalize, how learning systems improve themselves, and
+      which parts of discovery we might automate.
+    </p>
+  </section>
+
+  <section class="writing-archive">
+    <div class="archive-heading">
+      <span>Index</span>
+      <span>{writing.length.toString().padStart(2, "0")} published notes</span>
+    </div>
+    <div class="writing-list">
+      {
+        writing.map((post) => (
+          <WritingRow
+            title={post.title}
+            description={post.description}
+            topic={post.topic}
+            date={post.publishedAt}
+            href={post.href}
+            external={post.external}
+          />
+        ))
+      }
+    </div>
+  </section>
+</BaseLayout>

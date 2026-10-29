@@ -1,0 +1,53 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+---
+
+<BaseLayout
+  title="Input Perturbation as Augmentation for Pretraining Distillation — Jack Cai"
+  description="Distilling on perturbed inputs for part of pretraining improves small language models, and the gain comes from the teacher's predictions on the perturbed text."
+>
+  <section class="page-intro">
+    <h1>Input Perturbation as Augmentation for Pretraining Distillation</h1>
+    <p>Jack Cai · October 2026 · <a class="text-link" href="/writing/input-perturbation-distillation.pdf">Paper (PDF)</a></p>
+  </section>
+
+  <section class="post-body">
+    <p>
+      Knowledge distillation trains a student language model to match a teacher's predictions on
+      the training text. We ask whether the student also benefits from the teacher's predictions on
+      text that has been deliberately perturbed. For an early part of pretraining we perturb the
+      inputs and train the student to match the teacher on the perturbed text, and we spend the rest
+      of the same token budget on ordinary distillation. Teacher and student usually have embeddings
+      of different sizes, so we perturb the one-hot token vectors, which each model then maps through
+      its own embedding table. We test three perturbations: additive token noise, blending two
+      documents, and blending neighbouring tokens.
+    </p>
+    <figure>
+      <img src="/writing/input-perturbation-method.png" alt="Teacher and student receive the same perturbed one-hot input and the student matches the teacher's next-token distribution." />
+    </figure>
+    <p>
+      When pretraining from scratch, the method improves on standard distillation at both scales we
+      tried, by 0.025 nats at 135M parameters and by 0.020 nats at 0.5B (three seeds). At 135M this
+      is 1.45 times the gain that distillation itself provides over next-token training. The gain
+      depends on the teacher seeing the perturbed text: without a teacher it largely disappears, and
+      perturbing only the student's input, as pretraining augmentation usually does, recovers about a
+      third of it, while softer targets and a weaker early teacher do not reproduce it. When 262M
+      unique tokens are repeated for 16 epochs, the gain persists against a baseline with tuned
+      weight decay. The perturbed students also quantize at least as well with GPTQ and AWQ, and at
+      0.5B they gain about one point of average zero-shot accuracy over seven tasks.
+    </p>
+    <figure>
+      <img src="/writing/input-perturbation-results.png" alt="Change in final validation loss against standard distillation for each perturbation family at 135M and 0.5B." />
+      <figcaption>Change in final validation loss against standard distillation (below zero is better), at 135M (top) and 0.5B (bottom).</figcaption>
+    </figure>
+    <p><a class="text-link" href="/writing/input-perturbation-distillation.pdf">Read the full paper (PDF) →</a></p>
+  </section>
+</BaseLayout>
+
+<style>
+  .post-body { max-width: 68ch; display: grid; gap: 1.25rem; padding-bottom: 3rem; }
+  .post-body p { line-height: 1.65; }
+  .post-body figure { margin: 0.5rem 0; }
+  .post-body img { width: 100%; height: auto; }
+  .post-body figcaption { font-size: 0.9em; opacity: 0.75; margin-top: 0.4rem; }
+</style>
